@@ -1,0 +1,104 @@
+# Frontend - Node.js / Vite
+Frontend/node_modules/
+Frontend/dist/
+Frontend/dist-ssr/
+Frontend/.env.local
+Frontend/.env.*.local
+*.local
+
+# Frontend - npm/yarn/pnpm
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Frontend - Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Backend - Python
+backend/venv/
+backend/env/
+backend/.env
+backend/.venv/
+*.py[cod]
+*$py.class
+*.so
+__pycache__/
+*.egg-info/
+dist/
+build/
+*.egg
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Django
+backend/db.sqlite3
+backend/media/
+backend/staticfiles/
+backend/static/
+
+# IDE and Editor
+.vscode/
+!.vscode/extensions.json
+.idea/
+.vscode
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+.code-workspace
+
+# Visual Studio Code
+.vscode/*
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vs/
+
+# OS specific
+.DS_Store
+Thumbs.db
+.windows-terminal-settings.json
+
+# Environment and Configuration
+.env
+.env.local
+.env.*.local
+config.ini
+secrets.json
+
+# IDE temp files
+.project
+.pydevproject
+.settings/
+.classpath
+*.iml
+
+# OS generated
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Dependency directories
+node_modules/
+venv/
+env/
+
+# Build outputs
+/dist
+/build
+*.tar.gz
