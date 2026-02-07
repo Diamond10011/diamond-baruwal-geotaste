@@ -1,108 +1,476 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
-import Navbar from "../../components/Navbar";
+import { useNavigate } from "react-router-dom";
 import {
-  Container,
-  Card,
   FormInput,
   FormButton,
   Alert,
 } from "../../components/FormComponents";
-import axios from "axios";
 
 const Profile = () => {
-  const { user, changePassword } = useAuth();
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState("");
+  const navigate = useNavigate();
+  const { user, updateProfile, changePassword, logout, loading, error } =
+    useAuth();
   const [activeTab, setActiveTab] = useState("profile");
-  const [formData, setFormData] = useState({
+  const [editMode, setEditMode] = useState(false);
+
+  const [profileData, setProfileData] = useState({
     first_name: "",
     last_name: "",
     phone_number: "",
     location: "",
     bio: "",
-    dark_mode: false,
   });
+
   const [passwordData, setPasswordData] = useState({
-    old_password: "",
-    new_password: "",
-    new_password_confirm: "",
+    oldPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
+
+  const [validationErrors, setValidationErrors] = useState({});
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showOldPasswordTab2, setShowOldPasswordTab2] = useState(false);
+  const [showNewPasswordTab2, setShowNewPasswordTab2] = useState(false);
+  const [showConfirmPasswordTab2, setShowConfirmPasswordTab2] = useState(false);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const response = await axios.get("http://localhost:8000/api/profile/");
-        setProfile(response.data);
-        setFormData(response.data);
-        setError(null);
-      } catch (err) {
-        setError("Failed to load profile");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     if (user) {
-      fetchProfile();
+      setProfileData({
+        first_name: user.profile?.first_name || "",
+        last_name: user.profile?.last_name || "",
+        phone_number: user.profile?.phone_number || "",
+        location: user.profile?.location || "",
+        bio: user.profile?.bio || "",
+      });
     }
   }, [user]);
 
+  const validateProfile = () => {
+    const errors = {};
+    if (profileData.phone_number && !/^[0-9\s\-\+\(\)]{7,15}$/.test(profileData.phone_number)) {
+      errors.phone_number = "Invalid phone number";
+    }
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const validatePassword = () => {
+    const errors = {};
+    if (!passwordData.oldPassword) {
+      errors.oldPassword = "Current password is required";
+    }
+    if (!passwordData.newPassword) {
+      errors.newPassword = "New password is required";
+    } else if (passwordData.newPassword.length < 8) {
+      errors.newPassword = "Password must be at least 8 characters";
+    } else if (!/[A-Z]/.test(passwordData.newPassword)) {
+      errors.newPassword = "Password must contain uppercase letter";
+    } else if (!/[a-z]/.test(passwordData.newPassword)) {
+      errors.newPassword = "Password must contain lowercase letter";
+    } else if (!/[0-9]/.test(passwordData.newPassword)) {
+      errors.newPassword = "Password must contain a digit";
+    }
+
+    if (!passwordData.confirmPassword) {
+      errors.confirmPassword = "Please confirm password";
+    } else if (passwordData.newPassword !== passwordData.confirmPassword) {
+      errors.confirmPassword = "Passwords do not match";
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleProfileChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+    const { name, value } = e.target;
+    setProfileData((prev) => ({ ...prev, [name]: value }));
+    if (validationErrors[name]) {
+      setValidationErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
   };
 
   const handlePasswordChange = (e) => {
     const { name, value } = e.target;
-    setPasswordData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleProfileSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await axios.put(
-        "http://localhost:8000/api/profile/",
-        formData
-      );
-      setProfile(response.data.profile);
-      setSuccessMessage("Profile updated successfully");
-      setTimeout(() => setSuccessMessage(""), 3000);
-    } catch (err) {
-      setError("Failed to update profile");
+    setPasswordData((prev) => ({ ...prev, [name]: value }));
+    if (validationErrors[name]) {
+      setValidationErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
     }
   };
 
-  const handlePasswordSubmit = async (e) => {
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
+    if (!validateProfile()) return;
+
+    try {
+      await updateProfile(profileData);
+      setSuccessMessage("Profile updated successfully!");
+      setEditMode(false);
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      // Error is already in context
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (!validatePassword()) return;
+
     try {
       await changePassword(
-        passwordData.old_password,
-        passwordData.new_password,
-        passwordData.new_password_confirm
+        passwordData.oldPassword,
+        passwordData.newPassword,
+        passwordData.confirmPassword
       );
-      setSuccessMessage("Password changed successfully");
+      setSuccessMessage("Password changed successfully!");
       setPasswordData({
-        old_password: "",
-        new_password: "",
-        new_password_confirm: "",
+        oldPassword: "",
+        newPassword: "",
+        confirmPassword: "",
       });
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      setError("Failed to change password");
+      // Error is already in context
     }
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
   return (
-    <>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header Section */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+        <div className="max-w-6xl mx-auto px-4 py-12">
+          <div className="flex items-end space-x-6">
+            {/* Avatar */}
+            <div className="relative">
+              <div className="w-24 h-24 rounded-full bg-white text-blue-600 flex items-center justify-center border-4 border-blue-300 text-4xl font-bold">
+                {user.profile?.first_name?.[0]?.toUpperCase() ||
+                  user.email?.[0]?.toUpperCase() ||
+                  "U"}
+              </div>
+              <div className="absolute bottom-0 right-0 bg-green-500 w-6 h-6 rounded-full border-2 border-white"></div>
+            </div>
+
+            {/* User Info */}
+            <div className="pb-2">
+              <h1 className="text-3xl font-bold">
+                {(user.profile?.first_name + " " + user.profile?.last_name)
+                  .trim() || "User Profile"}
+              </h1>
+              <p className="text-blue-100">{user.email}</p>
+              <p className="text-blue-100 text-sm capitalize">
+                {user.role} • Member since{" "}
+                {new Date(user.created_at).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-gray-200 bg-white sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4">
+          <nav className="flex space-x-8">
+            {["profile", "security", "settings"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => {
+                  setActiveTab(tab);
+                  setEditMode(false);
+                }}
+                className={`px-4 py-4 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === tab
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {error && <Alert message={error} type="error" onClose={() => setError("")} />}
+        {successMessage && (
+          <Alert message={successMessage} type="success" onClose={() => setSuccessMessage("")} />
+        )}
+
+        {/* Profile Tab */}
+        {activeTab === "profile" && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Main Profile Form */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-lg shadow-md p-8">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Profile Information
+                  </h2>
+                  {!editMode && (
+                    <button
+                      onClick={() => setEditMode(true)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Edit Profile
+                    </button>
+                  )}
+                </div>
+
+                {editMode ? (
+                  <form onSubmit={handleSaveProfile} className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormInput
+                        label="First Name"
+                        name="first_name"
+                        value={profileData.first_name}
+                        onChange={handleProfileChange}
+                        error={validationErrors.first_name}
+                      />
+                      <FormInput
+                        label="Last Name"
+                        name="last_name"
+                        value={profileData.last_name}
+                        onChange={handleProfileChange}
+                        error={validationErrors.last_name}
+                      />
+                    </div>
+
+                    <FormInput
+                      label="Phone Number"
+                      name="phone_number"
+                      type="tel"
+                      value={profileData.phone_number}
+                      onChange={handleProfileChange}
+                      error={validationErrors.phone_number}
+                      placeholder="+1 (555) 000-0000"
+                    />
+
+                    <FormInput
+                      label="Location"
+                      name="location"
+                      value={profileData.location}
+                      onChange={handleProfileChange}
+                      error={validationErrors.location}
+                      placeholder="City, Country"
+                    />
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Bio
+                      </label>
+                      <textarea
+                        name="bio"
+                        value={profileData.bio}
+                        onChange={handleProfileChange}
+                        rows="4"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="Tell us about yourself..."
+                      />
+                    </div>
+
+                    <div className="flex gap-4">
+                      <FormButton loading={loading} type="submit">
+                        Save Changes
+                      </FormButton>
+                      <button
+                        type="button"
+                        onClick={() => setEditMode(false)}
+                        className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="border-b pb-4">
+                      <p className="text-sm text-gray-600">Full Name</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {(profileData.first_name + " " + profileData.last_name)
+                          .trim() || "Not set"}
+                      </p>
+                    </div>
+                    <div className="border-b pb-4">
+                      <p className="text-sm text-gray-600">Email</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {user.email}
+                      </p>
+                    </div>
+                    <div className="border-b pb-4">
+                      <p className="text-sm text-gray-600">Phone Number</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {profileData.phone_number || "Not set"}
+                      </p>
+                    </div>
+                    <div className="border-b pb-4">
+                      <p className="text-sm text-gray-600">Location</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {profileData.location || "Not set"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Bio</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {profileData.bio || "Not set"}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Statistics Card */}
+            <div className="bg-white rounded-lg shadow-md p-8 h-fit">
+              <h3 className="text-lg font-bold text-gray-900 mb-6">Statistics</h3>
+              <div className="space-y-4">
+                <div className="text-center pb-4 border-b">
+                  <p className="text-3xl font-bold text-blue-600">0</p>
+                  <p className="text-sm text-gray-600">Recipes Shared</p>
+                </div>
+                <div className="text-center pb-4 border-b">
+                  <p className="text-3xl font-bold text-green-600">0</p>
+                  <p className="text-sm text-gray-600">Followers</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-3xl font-bold text-purple-600">0</p>
+                  <p className="text-sm text-gray-600">Recipes Liked</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Security Tab */}
+        {activeTab === "security" && (
+          <div className="max-w-2xl">
+            <div className="bg-white rounded-lg shadow-md p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+                Change Password
+              </h2>
+
+              <form onSubmit={handleChangePassword} className="space-y-6">
+                <FormInput
+                  label="Current Password"
+                  type="password"
+                  name="oldPassword"
+                  value={passwordData.oldPassword}
+                  onChange={handlePasswordChange}
+                  error={validationErrors.oldPassword}
+                  placeholder="Enter your current password"
+                  required
+                  showPassword={showOldPassword}
+                  onTogglePassword={() => setShowOldPassword(!showOldPassword)}
+                />
+
+                <FormInput
+                  label="New Password"
+                  type="password"
+                  name="newPassword"
+                  value={passwordData.newPassword}
+                  onChange={handlePasswordChange}
+                  error={validationErrors.newPassword}
+                  placeholder="Enter your new password"
+                  required
+                  showPassword={showNewPassword}
+                  onTogglePassword={() => setShowNewPassword(!showNewPassword)}
+                />
+
+                <FormInput
+                  label="Confirm New Password"
+                  type="password"
+                  name="confirmPassword"
+                  value={passwordData.confirmPassword}
+                  onChange={handlePasswordChange}
+                  error={validationErrors.confirmPassword}
+                  placeholder="Confirm your new password"
+                  required
+                  showPassword={showConfirmPassword}
+                  onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+                />
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Password requirements:</strong>
+                    <ul className="mt-2 space-y-1 text-xs">
+                      <li>✓ Minimum 8 characters</li>
+                      <li>✓ At least one uppercase letter</li>
+                      <li>✓ At least one lowercase letter</li>
+                      <li>✓ At least one number</li>
+                    </ul>
+                  </p>
+                </div>
+
+                <FormButton loading={loading} type="submit">
+                  Update Password
+                </FormButton>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Settings Tab */}
+        {activeTab === "settings" && (
+          <div className="max-w-2xl">
+            <div className="bg-white rounded-lg shadow-md p-8 space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900">Settings</h2>
+
+              <div className="border-b pb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Account Settings
+                </h3>
+                <button
+                  onClick={handleLogout}
+                  className="w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+                >
+                  Logout
+                </button>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Danger Zone
+                </h3>
+                <button
+                  disabled
+                  className="w-full px-6 py-3 bg-gray-300 text-gray-700 rounded-lg cursor-not-allowed font-medium"
+                >
+                  Delete Account (Coming Soon)
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default Profile;
+ 
+{/* <>
       <Navbar />
       <Container className="pt-16">
         <div className="py-12">
@@ -121,7 +489,7 @@ const Profile = () => {
 
           {!loading && profile && (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Sidebar */}
+             // 
               <Card className="lg:col-span-1 h-fit">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">
                   Account
@@ -174,7 +542,7 @@ const Profile = () => {
                 </div>
               </Card>
 
-              {/* Main Content */}
+           
               <Card className="lg:col-span-3">
                 {activeTab === "profile" && (
                   <div>
@@ -286,6 +654,8 @@ const Profile = () => {
                         onChange={handlePasswordChange}
                         placeholder="••••••••"
                         required
+                        showPassword={showOldPasswordTab2}
+                        onTogglePassword={() => setShowOldPasswordTab2(!showOldPasswordTab2)}
                       />
 
                       <FormInput
@@ -296,6 +666,8 @@ const Profile = () => {
                         onChange={handlePasswordChange}
                         placeholder="••••••••"
                         required
+                        showPassword={showNewPasswordTab2}
+                        onTogglePassword={() => setShowNewPasswordTab2(!showNewPasswordTab2)}
                       />
 
                       <FormInput
@@ -306,6 +678,8 @@ const Profile = () => {
                         onChange={handlePasswordChange}
                         placeholder="••••••••"
                         required
+                        showPassword={showConfirmPasswordTab2}
+                        onTogglePassword={() => setShowConfirmPasswordTab2(!showConfirmPasswordTab2)}
                       />
 
                       <FormButton type="submit">Change Password</FormButton>
@@ -339,8 +713,4 @@ const Profile = () => {
           )}
         </div>
       </Container>
-    </>
-  );
-};
-
-export default Profile;
+    </> */}

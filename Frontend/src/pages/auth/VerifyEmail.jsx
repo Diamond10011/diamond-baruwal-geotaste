@@ -1,114 +1,195 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
-import { FormInput, FormButton, Alert } from "../../components/FormComponents";
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { Alert } from '../../components/FormComponents';
 
 const VerifyEmail = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { verifyEmail, loading, error } = useAuth();
+  const { verifyEmail, resendVerificationOTP, loading, error } = useAuth();
 
-  const [email, setEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [validationErrors, setValidationErrors] = useState({});
-  const [successMessage, setSuccessMessage] = useState("");
+  // ============================================================================
+  // STATE
+  // ============================================================================
+  const [email, setEmail] = useState(location.state?.email || '');
+  const [otpCode, setOtpCode] = useState('');
+  const [formErrors, setFormErrors] = useState({});
+  const [resendTimer, setResendTimer] = useState(0);
+  const [resendMessage, setResendMessage] = useState('');
 
-  useEffect(() => {
-    // Get email from location state if available
-    if (location.state?.email) {
-      setEmail(location.state.email);
+  // ============================================================================
+  // VALIDATION
+  // ============================================================================
+
+  const validateOTP = (otp) => {
+    if (!otp.trim()) {
+      return 'OTP is required';
     }
-  }, [location.state]);
+    if (otp.length !== 6) {
+      return 'OTP must be 6 digits';
+    }
+    if (!/^\d{6}$/.test(otp)) {
+      return 'OTP must contain only numbers';
+    }
+    return '';
+  };
 
-  const handleVerify = async (e) => {
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const errors = {};
 
-    if (!email) {
-      errors.email = "Email is required";
+    const otpError = validateOTP(otpCode);
+    if (otpError) {
+      setFormErrors({ otp: otpError });
+      return;
     }
 
-    if (!otpCode) {
-      errors.otpCode = "Verification code is required";
-    } else if (otpCode.length !== 6) {
-      errors.otpCode = "Code must be 6 digits";
-    }
-
-    setValidationErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    setFormErrors({});
 
     try {
-      await verifyEmail(email, otpCode);
-      setSuccessMessage("Email verified successfully! Redirecting to login...");
-      setTimeout(() => {
-        navigate("/login");
-      }, 2000);
+      const result = await verifyEmail(email, otpCode);
+      // Redirect to login with success message
+      navigate('/login', {
+        state: { message: 'Email verified successfully. Please login.' },
+      });
     } catch (err) {
-      // Error is already set in the context
+      console.error('Email verification error:', err);
     }
   };
 
+  const handleResendOTP = async () => {
+    try {
+      await resendVerificationOTP(email);
+      setResendMessage('Verification code resent to your email');
+      startResendTimer();
+      setTimeout(() => setResendMessage(''), 3000);
+    } catch (err) {
+      console.error('Error resending OTP:', err);
+    }
+  };
+
+  const startResendTimer = () => {
+    setResendTimer(60);
+  };
+
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendTimer]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-xl p-8">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-gray-900">GeoTaste</h2>
-          <p className="text-gray-600 mt-2">Verify Your Email</p>
+      <div className="w-full max-w-md bg-white rounded-lg shadow-xl p-8 space-y-8">
+        {/* Header */}
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">GeoTaste</h1>
+          <p className="text-gray-600">Verify your email address</p>
         </div>
 
-        {error && <Alert message={error} type="error" onClose={() => {}} />}
-        {successMessage && (
-          <Alert
-            message={successMessage}
-            type="success"
-            onClose={() => setSuccessMessage("")}
-          />
+        {/* Info Box */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <p className="text-sm text-blue-900">
+            We sent a 6-digit verification code to:
+            <br />
+            <strong>{email}</strong>
+          </p>
+        </div>
+
+        {/* Error Alert */}
+        {error && (
+          <Alert message={error} type="error" />
         )}
 
-        <form onSubmit={handleVerify} className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-700">
-              We've sent a verification code to your email. Please check your
-              inbox and enter the 6-digit code below.
-            </p>
+        {/* Success Message */}
+        {resendMessage && (
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-800 text-sm font-medium">{resendMessage}</p>
+          </div>
+        )}
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* OTP Input */}
+          <div>
+            <label htmlFor="otp" className="block text-sm font-medium text-gray-700 mb-2">
+              Verification Code
+            </label>
+            <input
+              type="text"
+              id="otp"
+              value={otpCode}
+              onChange={(e) => {
+                const value = e.target.value.slice(0, 6);
+                setOtpCode(value);
+                if (formErrors.otp) {
+                  setFormErrors((prev) => ({ ...prev, otp: '' }));
+                }
+              }}
+              placeholder="000000"
+              maxLength="6"
+              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-3xl tracking-widest font-mono ${
+                formErrors.otp ? 'border-red-500' : 'border-gray-300'
+              }`}
+            />
+            {formErrors.otp && (
+              <p className="mt-1 text-sm text-red-600">{formErrors.otp}</p>
+            )}
           </div>
 
-          <FormInput
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={validationErrors.email}
-            placeholder="your@email.com"
-            required
-          />
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          >
+            {loading ? 'Verifying...' : 'Verify Email'}
+          </button>
+        </form>
 
-          <FormInput
-            label="Verification Code"
-            type="text"
-            value={otpCode}
-            onChange={(e) => setOtpCode(e.target.value.slice(0, 6))}
-            error={validationErrors.otpCode}
-            placeholder="000000"
-            required
-            maxLength="6"
-          />
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-white text-gray-500">or</span>
+          </div>
+        </div>
 
-          <FormButton loading={loading} type="submit">
-            Verify Email
-          </FormButton>
-
-          <p className="text-center text-gray-600 text-sm">
-            Didn't receive the code?{" "}
+        {/* Resend OTP Section */}
+        <div className="text-center space-y-2">
+          <p className="text-sm text-gray-600">Didn't receive the code?</p>
+          {resendTimer > 0 ? (
+            <p className="text-sm font-medium text-gray-500">
+              Resend code in <strong>{resendTimer}s</strong>
+            </p>
+          ) : (
             <button
               type="button"
-              onClick={() => setSuccessMessage("Code resent to your email")}
-              className="text-blue-600 hover:text-blue-800 font-medium"
+              onClick={handleResendOTP}
+              disabled={loading}
+              className="text-blue-600 hover:text-blue-800 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Resend
+              Resend verification code
             </button>
-          </p>
-        </form>
+          )}
+        </div>
+
+        {/* Footer Links */}
+        <div className="flex justify-center gap-4 text-sm">
+          <Link to="/login" className="text-blue-600 hover:text-blue-800 font-medium">
+            Back to Login
+          </Link>
+          <span className="text-gray-300">•</span>
+          <Link to="/register" className="text-blue-600 hover:text-blue-800 font-medium">
+            Create Account
+          </Link>
+        </div>
       </div>
     </div>
   );

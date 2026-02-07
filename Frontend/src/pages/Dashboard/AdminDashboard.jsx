@@ -5,6 +5,7 @@ import {
   Container,
   Card,
   LoadingSpinner,
+  Alert,
 } from "../../components/FormComponents";
 import axios from "axios";
 
@@ -18,7 +19,7 @@ const AdminDashboard = () => {
     const fetchDashboard = async () => {
       try {
         const response = await axios.get(
-          "http://localhost:8000/api/admin-dashboard/"
+          "http://localhost:8000/api/admin-dashboard/",
         );
         setStats(response.data);
         setError(null);
@@ -61,9 +62,11 @@ const AdminDashboard = () => {
           </h1>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded mb-6">
-              {error}
-            </div>
+            <Alert
+              message={error}
+              type="error"
+              onClose={() => setError(null)}
+            />
           )}
 
           {stats && (
@@ -151,7 +154,7 @@ const AdminDashboard = () => {
                   <span className="text-xl font-bold text-gray-900">
                     {stats.total_users > 0
                       ? Math.round(
-                          (stats.verified_emails / stats.total_users) * 100
+                          (stats.verified_emails / stats.total_users) * 100,
                         )
                       : 0}
                     %

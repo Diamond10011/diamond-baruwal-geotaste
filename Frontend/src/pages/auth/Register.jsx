@@ -21,6 +21,8 @@ const Register = () => {
 
   const [validationErrors, setValidationErrors] = useState({});
   const [successMessage, setSuccessMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const validateForm = () => {
     const errors = {};
@@ -88,12 +90,12 @@ const Register = () => {
       );
 
       setSuccessMessage(
-        "Registration successful! Please check your email to verify your account."
+        "Registration successful! Redirecting to login..."
       );
       setFormData({ email: "", password: "", confirmPassword: "", role: "" });
 
       setTimeout(() => {
-        navigate("/verify-email", { state: { email: formData.email } });
+        navigate("/login");
       }, 2000);
     } catch (err) {
       // Error is already set in the context
@@ -114,7 +116,7 @@ const Register = () => {
           <p className="text-gray-600 mt-2">Create your account</p>
         </div>
 
-        {error && <Alert message={error} type="error" onClose={() => {}} />}
+        {error && <Alert message={error} type="error" onClose={() => setError("")} />}
         {successMessage && (
           <Alert
             message={successMessage}
@@ -144,6 +146,8 @@ const Register = () => {
             error={validationErrors.password}
             placeholder="Min. 8 characters"
             required
+            showPassword={showPassword}
+            onTogglePassword={() => setShowPassword(!showPassword)}
           />
 
           <FormInput
@@ -155,6 +159,8 @@ const Register = () => {
             error={validationErrors.confirmPassword}
             placeholder="Re-enter your password"
             required
+            showPassword={showConfirmPassword}
+            onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
           />
 
           <FormSelect

@@ -68,7 +68,7 @@ class UserProfile(models.Model):
     last_name = models.CharField(max_length=100, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
     location = models.CharField(max_length=255, blank=True)
-    profile_photo = models.ImageField(upload_to='profile_photos/', null=True, blank=True)
+    profile_photo = models.URLField(blank=True, null=True, help_text="URL to profile photo")
     bio = models.TextField(blank=True)
     dark_mode = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -136,4 +136,135 @@ class PasswordResetToken(models.Model):
     
     def is_valid(self):
         return timezone.now() < self.expires_at and not self.is_used
+
+
+# ============================================================================
+# RECIPE MODELS
+# ============================================================================
+
+class Recipe(models.Model):
+    """Recipe sharing model"""
+    DIFFICULTY_CHOICES = [
+        ('easy', 'Easy'),
+        ('medium', 'Medium'),
+        ('hard', 'Hard'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='recipes')
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    ingredients = models.TextField(help_text="Comma-separated list or JSON format")
+    instructions = models.TextField()
+    difficulty = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='medium')
+    cuisine_type = models.CharField(max_length=100, blank=True)
+    preparation_time = models.IntegerField(help_text="In minutes", default=30)
+    cooking_time = models.IntegerField(help_text="In minutes", default=30)
+    servings = models.IntegerField(default=4)
+    recipe_image = models.URLField(blank=True, null=True, help_text="URL to recipe image")
+    calories = models.IntegerField(blank=True, null=True)
+    dietary_tags = models.CharField(max_length=255, blank=True, help_text="e.g., vegan, gluten-free, low-carb")
+    views_count = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.title} by {self.author.email}"
+
+
+class RecipeRating(models.Model):
+    """User ratings and reviews for recipes"""
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='ratings')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    rating = models.IntegerField(choices=[(i, i) for i in range(1, 6)], help_text="1 to 5 stars")
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('recipe', 'user')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.rating}★ - {self.recipe.title} by {self.user.email}"
+
+
+class RecipeLike(models.Model):
+    """User likes for recipes"""
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='likes')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('recipe', 'user')
+    
+    def __str__(self):
+        return f"{self.user.email} liked {self.recipe.title}"
+
+
+# ============================================================================
+# RESTAURANT LOCATION MODELS
+# ============================================================================
+
+class RestaurantLocation(models.Model):
+    """Restaurant location with geolocation data"""
+    restaurant = models.OneToOneField(RestaurantUserProfile, on_delete=models.CASCADE, related_name='location')
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    city = models.CharField(max_length=100)
+    country = models.CharField(max_length=100)
+    postal_code = models.CharField(max_length=20, blank=True)
+    phone_number = models.CharField(max_length=20)
+    website = models.URLField(blank=True, null=True)
+    hours_open = models.TimeField(blank=True, null=True)
+    hours_close = models.TimeField(blank=True, null=True)
+    is_open = models.BooleanField(default=True)
+    rating_avg = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    total_ratings = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-rating_avg']
+    
+    def __str__(self):
+        return f"{self.restaurant.restaurant_name} - {self.city}"
+
+
+class RestaurantMenu(models.Model):
+    """Menu items for restaurants"""
+    restaurant = models.ForeignKey(RestaurantUserProfile, on_delete=models.CASCADE, related_name='menu_items')
+    name = models.CharField(max_length=255)
+    description = models.TextField()
+    price = models.DecimalField(max_digits=8, decimal_places=2)
+    category = models.CharField(max_length=100, help_text="e.g., Appetizer, Main, Dessert")
+    is_available = models.BooleanField(default=True)
+    dietary_info = models.CharField(max_length=255, blank=True, help_text="e.g., vegan, gluten-free")
+    image = models.URLField(blank=True, null=True, help_text="URL to menu item image")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['category', 'name']
+    
+    def __str__(self):
+        return f"{self.name} - {self.restaurant.restaurant_name}"
+
+
+class RestaurantRating(models.Model):
+    """Ratings for restaurants"""
+    restaurant = models.ForeignKey(RestaurantUserProfile, on_delete=models.CASCADE, related_name='ratings')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    rating = models.IntegerField(choices=[(i, i) for i in range(1, 6)])
+    comment = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('restaurant', 'user')
+    
+    def __str__(self):
+        return f"{self.rating}★ - {self.restaurant.restaurant_name}"
 
