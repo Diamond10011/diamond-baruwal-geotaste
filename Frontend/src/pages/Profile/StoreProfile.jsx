@@ -33,6 +33,7 @@ const StoreProfile = () => {
 
   useEffect(() => {
     loadStoreData();
+    loadProducts();
   }, []);
 
   const loadStoreData = async () => {
@@ -55,17 +56,43 @@ const StoreProfile = () => {
     }
   };
 
+  const loadProducts = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/store-products/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setProducts(response.data.products || []);
+    } catch (err) {
+      console.error("Failed to load products:", err);
+    }
+  };
+
+  const handleDeleteProduct = async (productId) => {
+    if (!window.confirm("Are you sure you want to delete this product?"))
+      return;
+
+    try {
+      setLoading(true);
+      await axios.delete(`${API_BASE_URL}/store-products/${productId}/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setProducts(products.filter((p) => p.id !== productId));
+      setSuccess("Product deleted successfully!");
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      setError("Failed to delete product");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
     try {
       setLoading(true);
-      await axios.put(
-        `${API_BASE_URL}/auth/update-profile/`,
-        profileData,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      await axios.put(`${API_BASE_URL}/auth/update-profile/`, profileData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       setSuccess("Profile updated successfully!");
       setIsEditing(false);
       setTimeout(() => setSuccess(""), 3000);
@@ -85,14 +112,22 @@ const StoreProfile = () => {
 
     try {
       setLoading(true);
-      // Placeholder API call - adjust based on your backend
-      setProducts([
-        ...products,
+      const response = await axios.post(
+        `${API_BASE_URL}/store-products/`,
         {
-          id: Date.now(),
-          ...newProduct,
+          name: newProduct.name,
+          description: newProduct.description,
+          price: parseFloat(newProduct.price),
+          category: newProduct.category,
+          stock: parseInt(newProduct.stock),
+          is_available: true,
         },
-      ]);
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      setProducts([...products, response.data.product]);
       setNewProduct({
         name: "",
         description: "",
@@ -103,7 +138,7 @@ const StoreProfile = () => {
       setSuccess("Product added successfully!");
       setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      setError("Failed to add product");
+      setError(err.response?.data?.message || "Failed to add product");
     } finally {
       setLoading(false);
     }
@@ -119,15 +154,11 @@ const StoreProfile = () => {
               <h1 className="text-4xl font-bold mb-2">
                 {profileData.first_name || "Store Manager"}
               </h1>
-              <p className="text-blue-100 text-lg">
-                🏬 Store Owner Dashboard
-              </p>
+              <p className="text-blue-100 text-lg">🏬 Store Owner Dashboard</p>
             </div>
             <div className="text-right">
               <p className="text-blue-100 text-sm">Member since</p>
-              <p className="text-2xl font-bold">
-                {new Date().getFullYear()}
-              </p>
+              <p className="text-2xl font-bold">{new Date().getFullYear()}</p>
             </div>
           </div>
         </div>
@@ -156,7 +187,11 @@ const StoreProfile = () => {
           <Alert message={error} type="error" onClose={() => setError("")} />
         )}
         {success && (
-          <Alert message={success} type="success" onClose={() => setSuccess("")} />
+          <Alert
+            message={success}
+            type="success"
+            onClose={() => setSuccess("")}
+          />
         )}
 
         {/* Profile Tab */}
@@ -448,6 +483,13 @@ const StoreProfile = () => {
                           📁 {product.category}
                         </p>
                       )}
+                      <button
+                        onClick={() => handleDeleteProduct(product.id)}
+                        disabled={loading}
+                        className="w-full px-3 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600 transition-colors disabled:opacity-50"
+                      >
+                        Delete
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -464,9 +506,7 @@ const StoreProfile = () => {
             </h3>
 
             {orders.length === 0 ? (
-              <p className="text-center text-gray-600 py-8">
-                No orders yet
-              </p>
+              <p className="text-center text-gray-600 py-8">No orders yet</p>
             ) : (
               <div className="space-y-4">
                 {orders.map((order) => (

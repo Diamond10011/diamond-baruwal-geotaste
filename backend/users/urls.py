@@ -8,7 +8,13 @@ from .views import (
     # Recipe endpoints
     recipe_list, recipe_detail, recipe_like, recipe_rating, user_recipes,
     # Restaurant endpoints
-    restaurant_list, restaurant_detail, restaurant_nearby, restaurant_menu, restaurant_rating
+    restaurant_list, restaurant_detail, restaurant_nearby, restaurant_menu, restaurant_rating,
+    # Store product endpoints
+    store_products, store_product_detail,
+    # Order endpoints
+    orders, order_detail,
+    # Payment endpoints
+    process_payment, payment_detail
 )
 
 urlpatterns = [
@@ -50,4 +56,16 @@ urlpatterns = [
     path('restaurants/nearby/', restaurant_nearby, name='restaurant_nearby'),
     path('restaurants/<str:restaurant_id>/menu/', restaurant_menu, name='restaurant_menu'),
     path('restaurants/<str:restaurant_id>/rating/', restaurant_rating, name='restaurant_rating'),
+    
+    # ==================== STORE PRODUCTS ====================
+    path('store-products/', store_products, name='store_products'),
+    path('store-products/<int:product_id>/', store_product_detail, name='store_product_detail'),
+    
+    # ==================== ORDERS ====================
+    path('orders/', orders, name='orders'),
+    path('orders/<str:order_id>/', order_detail, name='order_detail'),
+    
+    # ==================== PAYMENTS ====================
+    path('payments/process/', process_payment, name='process_payment'),
+    path('payments/<str:payment_id>/', payment_detail, name='payment_detail'),
 ]

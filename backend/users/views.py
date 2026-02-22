@@ -6,7 +6,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .models import (
     CustomUser, UserProfile, StoreUserProfile, RestaurantUserProfile, OTP,
-    Recipe, RecipeRating, RecipeLike, RestaurantLocation, RestaurantMenu, RestaurantRating
+    Recipe, RecipeRating, RecipeLike, RestaurantLocation, RestaurantMenu, RestaurantRating,
+    StoreProduct, Order, OrderItem, Payment
 )
 from .serializers import (
     RegisterSerializer, LoginSerializer, UserSerializer, UserProfileSerializer,
@@ -16,7 +17,8 @@ from .serializers import (
     RecipeListSerializer, RecipeDetailSerializer, RecipeCreateUpdateSerializer,
     RecipeRatingSerializer, RecipeLikeSerializer,
     RestaurantListSerializer, RestaurantDetailSerializer, RestaurantMenuSerializer,
-    RestaurantRatingSerializer, NearbyRestaurantSerializer
+    RestaurantRatingSerializer, NearbyRestaurantSerializer,
+    StoreProductSerializer, OrderSerializer, OrderItemSerializer, PaymentSerializer
 )
 from django.utils import timezone
 
@@ -699,3 +701,288 @@ def restaurant_rating(request, restaurant_id):
             rating.delete()
             return Response({'message': 'Rating deleted'}, status=status.HTTP_200_OK)
         return Response({'error': 'No rating found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# ============================================================================
+# STORE PRODUCT ENDPOINTS
+# ============================================================================
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def store_products(request):
+    """
+    GET: Get all store products or filter by store
+    POST: Add new store product (store owner only)
+    """
+    if request.method == 'GET':
+        store_id = request.query_params.get('store_id')
+        if store_id:
+            try:
+                store = StoreUserProfile.objects.get(id=store_id)
+                products = store.products.all()
+            except StoreUserProfile.DoesNotExist:
+                return Response({'error': 'Store not found'}, status=status.HTTP_404_NOT_FOUND)
+        else:
+            # Get products from user's own store
+            if request.user.role != 'store':
+                return Response({'error': 'Only store users can access this'}, status=status.HTTP_403_FORBIDDEN)
+            try:
+                store = StoreUserProfile.objects.get(user=request.user)
+                products = store.products.all()
+            except StoreUserProfile.DoesNotExist:
+                return Response({'error': 'Store profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        serializer = StoreProductSerializer(products, many=True)
+        return Response({
+            'count': products.count(),
+            'products': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    # POST - Add product (store owner only)
+    if request.user.role != 'store':
+        return Response({'error': 'Only store users can add products'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        store = StoreUserProfile.objects.get(user=request.user)
+    except StoreUserProfile.DoesNotExist:
+        return Response({'error': 'Store profile not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    serializer = StoreProductSerializer(data=request.data)
+    if serializer.is_valid():
+        product = serializer.save(store=store)
+        return Response({
+            'message': 'Product added successfully',
+            'product': StoreProductSerializer(product).data
+        }, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def store_product_detail(request, product_id):
+    """
+    Get, update, or delete a store product
+    """
+    try:
+        product = StoreProduct.objects.get(id=product_id)
+    except StoreProduct.DoesNotExist:
+        return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user owns this store
+    if request.method in ['PUT', 'DELETE']:
+        if product.store.user != request.user:
+            return Response({'error': 'You can only modify your own products'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.method == 'GET':
+        serializer = StoreProductSerializer(product)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PUT':
+        serializer = StoreProductSerializer(product, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Product updated successfully',
+                'product': serializer.data
+            }, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        product.delete()
+        return Response({'message': 'Product deleted successfully'}, status=status.HTTP_200_OK)
+
+
+# ============================================================================
+# ORDER ENDPOINTS
+# ============================================================================
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def orders(request):
+    """
+    GET: Get user's orders
+    POST: Create a new order
+    """
+    if request.method == 'GET':
+        user_orders = Order.objects.filter(customer=request.user).order_by('-created_at')
+        serializer = OrderSerializer(user_orders, many=True)
+        return Response({
+            'count': user_orders.count(),
+            'orders': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    # POST - Create order
+    data = request.data
+    
+    # Get or create store
+    store_id = data.get('store_id')
+    if not store_id:
+        return Response({'error': 'store_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        store = StoreUserProfile.objects.get(id=store_id)
+    except StoreUserProfile.DoesNotExist:
+        return Response({'error': 'Store not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Create order
+    import uuid
+    order = Order.objects.create(
+        order_id=str(uuid.uuid4()),
+        customer=request.user,
+        store=store,
+        delivery_address=data.get('delivery_address', ''),
+        notes=data.get('notes', '')
+    )
+    
+    # Add order items
+    items_data = data.get('items', [])
+    subtotal = 0
+    
+    for item in items_data:
+        product_id = item.get('product_id')
+        quantity = item.get('quantity', 1)
+        
+        try:
+            product = StoreProduct.objects.get(id=product_id)
+        except StoreProduct.DoesNotExist:
+            order.delete()
+            return Response({'error': f'Product {product_id} not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if product.stock < quantity:
+            order.delete()
+            return Response({'error': f'{product.name} has insufficient stock'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        item_subtotal = float(product.price) * quantity
+        OrderItem.objects.create(
+            order=order,
+            product=product,
+            quantity=quantity,
+            price=product.price,
+            subtotal=item_subtotal
+        )
+        subtotal += item_subtotal
+    
+    # Calculate tax and total
+    tax = round(subtotal * 0.1, 2)  # 10% tax
+    total = subtotal + tax
+    
+    # Update order totals
+    order.subtotal = subtotal
+    order.tax = tax
+    order.total_amount = total
+    order.status = 'payment_pending'
+    order.save()
+    
+    return Response({
+        'message': 'Order created successfully',
+        'order': OrderSerializer(order).data
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def order_detail(request, order_id):
+    """
+    Get or update an order
+    """
+    try:
+        order = Order.objects.get(order_id=order_id)
+    except Order.DoesNotExist:
+        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user owns this order
+    if order.customer != request.user and order.store.user != request.user:
+        return Response({'error': 'You cannot access this order'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.method == 'GET':
+        serializer = OrderSerializer(order)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PUT':
+        # Only allow updating delivery address and notes
+        order.delivery_address = request.data.get('delivery_address', order.delivery_address)
+        order.notes = request.data.get('notes', order.notes)
+        order.save()
+        
+        return Response({
+            'message': 'Order updated successfully',
+            'order': OrderSerializer(order).data
+        }, status=status.HTTP_200_OK)
+
+
+# ============================================================================
+# PAYMENT ENDPOINTS
+# ============================================================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def process_payment(request):
+    """
+    Process payment for an order (demo payment)
+    """
+    data = request.data
+    order_id = data.get('order_id')
+    payment_method = data.get('payment_method', 'demo')
+    
+    if not order_id:
+        return Response({'error': 'order_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        order = Order.objects.get(order_id=order_id)
+    except Order.DoesNotExist:
+        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user owns this order
+    if order.customer != request.user:
+        return Response({'error': 'You can only pay for your own orders'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Check if payment already exists
+    if hasattr(order, 'payment'):
+        return Response({
+            'error': 'Payment already processed for this order',
+            'payment': PaymentSerializer(order.payment).data
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    import uuid
+    # Create payment record
+    payment = Payment.objects.create(
+        payment_id=str(uuid.uuid4()),
+        order=order,
+        amount=order.total_amount,
+        payment_method=payment_method,
+        status='pending'
+    )
+    
+    # Demo payment - automatically mark as completed
+    payment.status = 'completed'
+    payment.transaction_id = f'DEMO-{str(uuid.uuid4())[:8].upper()}'
+    payment.save()
+    
+    # Update order status
+    order.status = 'paid'
+    order.save()
+    
+    return Response({
+        'message': 'Payment processed successfully (Demo)',
+        'payment': PaymentSerializer(payment).data,
+        'order': OrderSerializer(order).data
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def payment_detail(request, payment_id):
+    """
+    Get payment details
+    """
+    try:
+        payment = Payment.objects.get(payment_id=payment_id)
+    except Payment.DoesNotExist:
+        return Response({'error': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user owns this payment
+    if payment.order.customer != request.user and payment.order.store.user != request.user:
+        return Response({'error': 'You cannot access this payment'}, status=status.HTTP_403_FORBIDDEN)
+    
+    serializer = PaymentSerializer(payment)
+    return Response(serializer.data, status=status.HTTP_200_OK)

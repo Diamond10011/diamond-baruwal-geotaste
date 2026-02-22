@@ -3,7 +3,8 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from .models import (
     CustomUser, UserProfile, StoreUserProfile, RestaurantUserProfile, OTP, PasswordResetToken,
-    Recipe, RecipeRating, RecipeLike, RestaurantLocation, RestaurantMenu, RestaurantRating
+    Recipe, RecipeRating, RecipeLike, RestaurantLocation, RestaurantMenu, RestaurantRating,
+    StoreProduct, Order, OrderItem, Payment
 )
 from django.core.mail import send_mail
 from django.conf import settings
@@ -527,3 +528,65 @@ class NearbyRestaurantSerializer(serializers.Serializer):
     longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
     radius = serializers.IntegerField(default=10, help_text="Radius in kilometers")
     cuisine_type = serializers.CharField(required=False, allow_blank=True)
+
+
+# ============================================================================
+# STORE PRODUCT SERIALIZERS
+# ============================================================================
+
+class StoreProductSerializer(serializers.ModelSerializer):
+    """Serializer for store products"""
+    store_name = serializers.CharField(source='store.store_name', read_only=True)
+    
+    class Meta:
+        model = StoreProduct
+        fields = [
+            'id', 'store_name', 'name', 'description', 'price', 'category',
+            'stock', 'is_available', 'image', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+# ============================================================================
+# ORDER & PAYMENT SERIALIZERS
+# ============================================================================
+
+class OrderItemSerializer(serializers.ModelSerializer):
+    """Serializer for order items"""
+    product_name = serializers.CharField(source='product.name', read_only=True)
+    product_id = serializers.IntegerField(source='product.id', read_only=True)
+    
+    class Meta:
+        model = OrderItem
+        fields = ['id', 'product_id', 'product_name', 'quantity', 'price', 'subtotal']
+        read_only_fields = ['id', 'subtotal']
+
+
+class OrderSerializer(serializers.ModelSerializer):
+    """Serializer for orders"""
+    items = OrderItemSerializer(many=True, read_only=True)
+    customer_email = serializers.CharField(source='customer.email', read_only=True)
+    store_name = serializers.CharField(source='store.store_name', read_only=True)
+    
+    class Meta:
+        model = Order
+        fields = [
+            'id', 'order_id', 'customer_email', 'store_name', 'status',
+            'total_amount', 'subtotal', 'tax', 'delivery_address', 'notes',
+            'items', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'order_id', 'total_amount', 'subtotal', 'tax', 'created_at', 'updated_at']
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    """Serializer for payments"""
+    order_id = serializers.CharField(source='order.order_id', read_only=True)
+    
+    class Meta:
+        model = Payment
+        fields = [
+            'id', 'payment_id', 'order_id', 'amount', 'payment_method',
+            'status', 'transaction_id', 'notes', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'payment_id', 'created_at', 'updated_at']
+
