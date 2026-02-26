@@ -348,7 +348,7 @@ class RecipeListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'author_email', 'author_name', 'description', 'difficulty',
             'cuisine_type', 'preparation_time', 'cooking_time', 'servings', 'recipe_image',
-            'dietary_tags', 'views_count', 'rating_count', 'likes_count', 'avg_rating',
+            'recipe_video', 'dietary_tags', 'views_count', 'rating_count', 'likes_count', 'avg_rating',
             'created_at'
         ]
         read_only_fields = ['id', 'author_email', 'views_count', 'created_at']
@@ -385,7 +385,7 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'author_email', 'author_name', 'description', 'ingredients',
             'instructions', 'difficulty', 'cuisine_type', 'preparation_time', 'cooking_time',
-            'servings', 'recipe_image', 'calories', 'dietary_tags', 'views_count',
+            'servings', 'recipe_image', 'recipe_video', 'calories', 'dietary_tags', 'views_count',
             'likes_count', 'user_liked', 'rating_count', 'user_rating', 'avg_rating',
             'ratings', 'created_at', 'updated_at'
         ]
@@ -426,7 +426,7 @@ class RecipeCreateUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'title', 'description', 'ingredients', 'instructions', 'difficulty',
             'cuisine_type', 'preparation_time', 'cooking_time', 'servings',
-            'recipe_image', 'calories', 'dietary_tags'
+            'recipe_image', 'recipe_video', 'calories', 'dietary_tags'
         ]
 
 

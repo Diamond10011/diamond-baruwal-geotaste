@@ -2,16 +2,23 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
-import {
-  FormInput,
-  FormButton,
-  Alert,
-} from "../components/FormComponents";
+import { FormInput, FormButton, Alert } from "../components/FormComponents";
 
 const API_BASE_URL = "http://localhost:8000/api";
 
 const Recipes = () => {
-  const { user, loading, error, favorites, addRecipeToFavorites, removeRecipeFromFavorites, isFavoriteRecipe, addRecipeSearch, searchHistory } = useAuth();
+  const {
+    user,
+    loading,
+    error,
+    favorites,
+    addRecipeToFavorites,
+    removeRecipeFromFavorites,
+    isFavoriteRecipe,
+    addRecipeSearch,
+    searchHistory,
+    clearSearchHistory,
+  } = useAuth();
   const navigate = useNavigate();
   const [recipes, setRecipes] = useState([]);
   const [filteredRecipes, setFilteredRecipes] = useState([]);
@@ -34,6 +41,7 @@ const Recipes = () => {
     cooking_time: 30,
     servings: 4,
     recipe_image: "",
+    recipe_video: "",
     calories: "",
     dietary_tags: "",
   });
@@ -53,13 +61,14 @@ const Recipes = () => {
     let filtered = recipes;
 
     if (filterDifficulty !== "all") {
-      filtered = filtered.filter(r => r.difficulty === filterDifficulty);
+      filtered = filtered.filter((r) => r.difficulty === filterDifficulty);
     }
 
     if (searchTerm) {
-      filtered = filtered.filter(r =>
-        r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.cuisine_type.toLowerCase().includes(searchTerm.toLowerCase())
+      filtered = filtered.filter(
+        (r) =>
+          r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          r.cuisine_type.toLowerCase().includes(searchTerm.toLowerCase()),
       );
     }
 
@@ -104,9 +113,12 @@ const Recipes = () => {
   const validateForm = () => {
     const errors = {};
     if (!formData.title.trim()) errors.title = "Title is required";
-    if (!formData.description.trim()) errors.description = "Description is required";
-    if (!formData.ingredients.trim()) errors.ingredients = "Ingredients are required";
-    if (!formData.instructions.trim()) errors.instructions = "Instructions are required";
+    if (!formData.description.trim())
+      errors.description = "Description is required";
+    if (!formData.ingredients.trim())
+      errors.ingredients = "Ingredients are required";
+    if (!formData.instructions.trim())
+      errors.instructions = "Instructions are required";
     if (formData.preparation_time < 0) errors.preparation_time = "Invalid time";
     if (formData.cooking_time < 0) errors.cooking_time = "Invalid time";
     if (formData.servings < 1) errors.servings = "Servings must be at least 1";
@@ -117,9 +129,9 @@ const Recipes = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
     if (validationErrors[name]) {
-      setValidationErrors(prev => ({
+      setValidationErrors((prev) => ({
         ...prev,
         [name]: "",
       }));
@@ -144,7 +156,9 @@ const Recipes = () => {
       });
 
       setSuccessMessage(
-        editingId ? "Recipe updated successfully!" : "Recipe created successfully!"
+        editingId
+          ? "Recipe updated successfully!"
+          : "Recipe created successfully!",
       );
       setFormData({
         title: "",
@@ -157,6 +171,7 @@ const Recipes = () => {
         cooking_time: 30,
         servings: 4,
         recipe_image: "",
+        recipe_video: "",
         calories: "",
         dietary_tags: "",
       });
@@ -188,11 +203,15 @@ const Recipes = () => {
 
   const handleLikeRecipe = async (id) => {
     try {
-      await axios.post(`${API_BASE_URL}/recipes/${id}/like/`, {}, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+      await axios.post(
+        `${API_BASE_URL}/recipes/${id}/like/`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          },
         },
-      });
+      );
       fetchRecipes();
     } catch (err) {
       console.error("Failed to like recipe");
@@ -205,15 +224,29 @@ const Recipes = () => {
       <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white py-12">
         <div className="max-w-6xl mx-auto px-4">
           <h1 className="text-4xl font-bold mb-2">Recipe Sharing Community</h1>
-          <p className="text-orange-100">Discover and share delicious recipes</p>
+          <p className="text-orange-100">
+            Discover and share delicious recipes
+          </p>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
         {error && <Alert message={error} type="error" onClose={() => {}} />}
-        {listError && <Alert message={listError} type="error" onClose={() => setListError(null)} />}
-        {successMessage && <Alert message={successMessage} type="success" onClose={() => setSuccessMessage("")} />}
+        {listError && (
+          <Alert
+            message={listError}
+            type="error"
+            onClose={() => setListError(null)}
+          />
+        )}
+        {successMessage && (
+          <Alert
+            message={successMessage}
+            type="success"
+            onClose={() => setSuccessMessage("")}
+          />
+        )}
 
         {/* Create Recipe Button */}
         {user && (
@@ -258,7 +291,9 @@ const Recipes = () => {
                   placeholder="Tell us about your recipe..."
                 />
                 {validationErrors.description && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
+                  <p className="mt-1 text-sm text-red-600">
+                    {validationErrors.description}
+                  </p>
                 )}
               </div>
 
@@ -275,7 +310,9 @@ const Recipes = () => {
                   placeholder="2 cups flour&#10;1 cup sugar&#10;3 eggs&#10;..."
                 />
                 {validationErrors.ingredients && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.ingredients}</p>
+                  <p className="mt-1 text-sm text-red-600">
+                    {validationErrors.ingredients}
+                  </p>
                 )}
               </div>
 
@@ -292,7 +329,9 @@ const Recipes = () => {
                   placeholder="Step 1: ...&#10;Step 2: ...&#10;..."
                 />
                 {validationErrors.instructions && (
-                  <p className="mt-1 text-sm text-red-600">{validationErrors.instructions}</p>
+                  <p className="mt-1 text-sm text-red-600">
+                    {validationErrors.instructions}
+                  </p>
                 )}
               </div>
 
@@ -369,6 +408,15 @@ const Recipes = () => {
               />
 
               <FormInput
+                label="Recipe Video URL (optional)"
+                name="recipe_video"
+                type="url"
+                value={formData.recipe_video}
+                onChange={handleChange}
+                placeholder="https://youtube.com/... or https://vimeo.com/..."
+              />
+
+              <FormInput
                 label="Dietary Tags"
                 name="dietary_tags"
                 value={formData.dietary_tags}
@@ -400,7 +448,7 @@ const Recipes = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search
+                Search Recipes
               </label>
               <div className="relative">
                 <input
@@ -408,18 +456,34 @@ const Recipes = () => {
                   placeholder="Search recipes..."
                   value={searchTerm}
                   onChange={handleSearchChange}
-                  onFocus={() => setShowSearchHistory(searchHistory.recipes.length > 0)}
+                  onFocus={() =>
+                    setShowSearchHistory(searchHistory.recipes.length > 0)
+                  }
+                  onBlur={() =>
+                    setTimeout(() => setShowSearchHistory(false), 200)
+                  }
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
                 />
                 {showSearchHistory && searchHistory.recipes.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+                    <div className="p-2 bg-gray-50 border-b sticky top-0">
+                      <p className="text-xs font-semibold text-gray-600 uppercase">
+                        Recent Searches
+                      </p>
+                    </div>
                     {searchHistory.recipes.map((term, index) => (
                       <button
                         key={index}
                         onClick={() => handleSearchHistoryClick(term)}
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 first:rounded-t-lg last:rounded-b-lg border-b last:border-b-0 text-sm text-gray-700"
+                        className="w-full text-left px-4 py-2 hover:bg-orange-50 border-b last:border-b-0 text-sm text-gray-700 flex items-center justify-between group"
                       >
-                        🕐 {term}
+                        <span className="flex items-center gap-2">
+                          <span className="text-gray-400">🕐</span>
+                          {term}
+                        </span>
+                        <span className="text-gray-300 group-hover:text-gray-400">
+                          ↵
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -428,7 +492,7 @@ const Recipes = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Difficulty
+                Difficulty Level
               </label>
               <select
                 value={filterDifficulty}
@@ -448,6 +512,54 @@ const Recipes = () => {
             </div>
           </div>
         </div>
+
+        {/* Recent Searches Section */}
+        {searchHistory.recipes.length > 0 && !searchTerm && (
+          <div className="bg-gradient-to-r from-orange-50 to-red-50 rounded-lg shadow-md p-6 mb-8 border-l-4 border-orange-500">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  🕐 Recent Searches
+                </h3>
+                <span className="text-sm text-gray-600 bg-white px-2 py-1 rounded-full">
+                  {searchHistory.recipes.length}
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "Clear all search history? This cannot be undone.",
+                    )
+                  ) {
+                    clearSearchHistory();
+                  }
+                }}
+                className="text-sm px-3 py-1 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+              >
+                Clear All
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {searchHistory.recipes.map((term, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setSearchTerm(term);
+                    addRecipeSearch(term);
+                  }}
+                  className="px-4 py-2 bg-white text-gray-700 rounded-full border border-orange-200 hover:border-orange-500 hover:text-orange-600 transition-all text-sm font-medium flex items-center gap-2 group"
+                >
+                  <span>🔍</span>
+                  {term}
+                  <span className="text-gray-400 group-hover:text-orange-600">
+                    →
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Recipes Grid */}
         {recipesLoading ? (
@@ -564,7 +676,10 @@ const Recipes = () => {
 
                   {/* Actions */}
                   <div className="flex gap-2 pt-4">
-                    <button className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium">
+                    <button
+                      onClick={() => navigate(`/recipes/${recipe.id}`)}
+                      className="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium"
+                    >
                       View Details
                     </button>
 

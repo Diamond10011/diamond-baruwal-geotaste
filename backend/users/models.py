@@ -162,6 +162,7 @@ class Recipe(models.Model):
     cooking_time = models.IntegerField(help_text="In minutes", default=30)
     servings = models.IntegerField(default=4)
     recipe_image = models.URLField(blank=True, null=True, help_text="URL to recipe image")
+    recipe_video = models.URLField(blank=True, null=True, help_text="URL to recipe video (YouTube, Vimeo, etc.)")
     calories = models.IntegerField(blank=True, null=True)
     dietary_tags = models.CharField(max_length=255, blank=True, help_text="e.g., vegan, gluten-free, low-carb")
     views_count = models.IntegerField(default=0)

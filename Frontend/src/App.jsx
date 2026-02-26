@@ -20,6 +20,7 @@ import VerifyEmail from "./pages/auth/VerifyEmail";
 import Home from "./pages/common/Home";
 import Profile from "./pages/Profile/Profile";
 import Recipes from "./pages/Recipes";
+import RecipeDetail from "./pages/RecipeDetail";
 import Favorites from "./pages/Favorites";
 import RestaurantSearch from "./pages/RestaurantSearch";
 import RestaurantProfile from "./pages/RestaurantProfile";
@@ -102,6 +103,7 @@ export default function App() {
 
             {/* Recipe Routes */}
             <Route path="/recipes" element={<Recipes />} />
+            <Route path="/recipes/:id" element={<RecipeDetail />} />
             <Route path="/favorites" element={<Favorites />} />
 
             {/* Restaurant Routes */}
