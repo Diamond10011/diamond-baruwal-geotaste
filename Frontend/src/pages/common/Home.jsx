@@ -14,7 +14,7 @@ const Home = () => {
   const [error, setError] = useState(null);
   const [location, setLocation] = useState("");
   const [isLocating, setIsLocating] = useState(false);
-
+  const heroBg = "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&q=80&w=2070";
   useEffect(() => {
     fetchData();
   }, []);
@@ -82,68 +82,60 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Background Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-900/50 to-gray-900/50 z-0"></div>
+     {/* Hero Section with Background Image */}
+      <section 
+        className="relative h-[90vh] flex items-center justify-center bg-cover bg-center transition-all duration-700"
+        style={{ backgroundImage: `url(${heroBg})` }}
+      >
+        {/* Dark Overlay for Readability */}
+        <div className="absolute inset-0 bg-black/50 backdrop-brightness-75 z-0"></div>
         
-        {/* Content */}
         <div className="relative z-10 max-w-5xl mx-auto px-4 text-center w-full">
-          {/* Main Heading */}
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
-            Discover Local Flavors <br />
-            <span className="text-orange-500">Near You</span>
+          <h1 className="text-5xl md:text-7xl font-extrabold text-white mb-6 tracking-tight drop-shadow-lg">
+            Discover Local <span className="text-orange-500">Flavors</span>
           </h1>
 
-          {/* Subheading */}
-          <p className="text-lg md:text-xl text-gray-300 mb-12 max-w-3xl mx-auto">
-            Personalized food recommendations based on your location, preferences, and dietary needs. Find restaurants, explore recipes, and plan your meals.
+          <p className="text-xl text-gray-200 mb-10 max-w-2xl mx-auto font-medium drop-shadow-md">
+            The freshest ingredients and top-rated restaurants, right at your fingertips.
           </p>
 
-          {/* Search Card */}
-          <div className="bg-white rounded-2xl p-6 md:p-8 shadow-2xl max-w-3xl mx-auto">
-            {/* Search Inputs */}
-            <div className="flex flex-col md:flex-row gap-3 mb-6">
-              {/* Location Input */}
-              <div className="relative flex-1">
+          {/* Glassmorphism Search Card */}
+          <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl p-6 md:p-10 shadow-2xl max-w-4xl mx-auto">
+            <div className="flex flex-col md:flex-row gap-4 mb-8">
+              <div className="relative flex-1 group">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">📍</span>
                 <input
                   type="text"
-                  placeholder="Enter your location or address..."
+                  placeholder="Enter address..."
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-gray-100 border-0 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-gray-900 placeholder-gray-600 font-medium"
+                  className="w-full pl-12 pr-4 py-4 bg-white/90 rounded-2xl focus:ring-4 focus:ring-orange-500/50 outline-none transition-all text-gray-900 font-medium"
                 />
               </div>
 
-              {/* Location Button */}
               <button
                 onClick={handleGetLocation}
                 disabled={isLocating}
-                className="px-6 py-3 bg-white border-2 border-orange-500 text-orange-600 rounded-lg hover:bg-orange-50 transition-colors font-semibold flex items-center justify-center gap-2 disabled:opacity-50 whitespace-nowrap"
+                className="px-6 py-4 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-2xl backdrop-blur-sm transition-all font-bold flex items-center justify-center gap-2"
               >
-                <span>🧭</span>
-                {isLocating ? "Locating..." : "Use My Location"}
+                {isLocating ? "..." : "🧭 Use My Location"}
               </button>
 
-              {/* Find Food Button */}
               <button
                 onClick={handleFindFood}
-                className="px-8 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-all font-semibold flex items-center justify-center gap-2 whitespace-nowrap"
+                className="px-10 py-4 bg-orange-600 hover:bg-orange-500 text-white rounded-2xl shadow-lg shadow-orange-900/20 transition-all font-bold text-lg"
               >
-                <span>🔍</span>
                 Find Food
               </button>
             </div>
 
-            {/* Quick Filters */}
-            <div className="flex flex-wrap gap-2 justify-center">
-              {quickFilters.map((filter) => (
+            <div className="flex flex-wrap gap-3 justify-center">
+              {quickFilters.map((f) => (
                 <button
-                  key={filter.label}
-                  className="px-4 py-2 text-sm rounded-full bg-gray-100 text-gray-700 hover:bg-orange-100 hover:text-orange-700 transition-colors font-medium"
+                  key={f.label}
+                  className="px-5 py-2 text-sm rounded-full bg-black/30 hover:bg-orange-600 text-white border border-white/10 backdrop-blur-md transition-all font-semibold"
                 >
-                  {filter.icon} {filter.label}
+                  {f.icon} {f.label}
                 </button>
               ))}
             </div>
@@ -391,3 +383,5 @@ const Home = () => {
 };
 
 export default Home;
+
+

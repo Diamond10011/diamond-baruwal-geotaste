@@ -155,18 +155,18 @@ const RecipeDetail = () => {
   const embedUrl = getEmbedUrl(recipe.recipe_video);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-gray-50 to-orange-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-500 to-red-600 text-white py-8">
+      <div className="bg-gradient-to-br from-orange-500 via-red-500 to-red-700 text-white py-12 shadow-2xl">
         <div className="max-w-6xl mx-auto px-4">
           <button
             onClick={() => navigate("/recipes")}
-            className="text-white hover:text-orange-100 mb-4 flex items-center gap-2"
+            className="text-white hover:text-orange-100 mb-4 flex items-center gap-2 transition-colors hover:scale-105"
           >
             ← Back to Recipes
           </button>
-          <h1 className="text-4xl font-bold">{recipe.title}</h1>
-          <p className="text-orange-100 mt-2">by {recipe.author_name}</p>
+          <h1 className="text-5xl font-bold mb-2">{recipe.title}</h1>
+          <p className="text-orange-100 text-lg">👨‍🍳 by {recipe.author_name}</p>
         </div>
       </div>
 
@@ -188,18 +188,18 @@ const RecipeDetail = () => {
           <div className="lg:col-span-2">
             {/* Recipe Image */}
             {recipe.recipe_image && (
-              <div className="mb-8 rounded-lg overflow-hidden shadow-md">
+              <div className="mb-8 rounded-2xl overflow-hidden shadow-2xl hover:shadow-3xl transition-shadow">
                 <img
                   src={recipe.recipe_image}
                   alt={recipe.title}
-                  className="w-full h-96 object-cover"
+                  className="w-full h-96 object-cover hover:scale-105 transition-transform duration-500"
                 />
               </div>
             )}
 
             {/* Recipe Video */}
             {recipe.recipe_video && embedUrl && (
-              <div className="mb-8 rounded-lg overflow-hidden shadow-md">
+              <div className="mb-8 rounded-2xl overflow-hidden shadow-2xl hover:shadow-3xl transition-shadow border-2 border-orange-100">
                 <div className="bg-black aspect-video">
                   <iframe
                     width="100%"
@@ -215,28 +215,30 @@ const RecipeDetail = () => {
             )}
 
             {/* Description */}
-            <div className="mb-8 bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold mb-4 text-gray-900">
-                About this Recipe
+            <div className="mb-8 bg-white rounded-2xl shadow-lg p-8 border border-orange-50 hover:shadow-xl transition-shadow">
+              <h2 className="text-3xl font-bold mb-4 text-gray-900 flex items-center gap-2">
+                📖 About this Recipe
               </h2>
-              <p className="text-gray-700 text-lg">{recipe.description}</p>
+              <p className="text-gray-700 text-lg leading-relaxed">
+                {recipe.description}
+              </p>
             </div>
 
             {/* Ingredients */}
-            <div className="mb-8 bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold mb-4 text-gray-900">
-                Ingredients
+            <div className="mb-8 bg-white rounded-2xl shadow-lg p-8 border border-orange-50 hover:shadow-xl transition-shadow">
+              <h2 className="text-3xl font-bold mb-6 text-gray-900 flex items-center gap-2">
+                🛒 Ingredients
               </h2>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {recipe.ingredients.split("\n").map(
                   (ingredient, index) =>
                     ingredient.trim() && (
                       <div key={index} className="flex items-start gap-3">
                         <input
                           type="checkbox"
-                          className="mt-1 rounded border-gray-300"
+                          className="mt-1 rounded border-gray-300 w-5 h-5 text-orange-500 focus:ring-orange-500"
                         />
-                        <span className="text-gray-700">
+                        <span className="text-gray-700 text-base flex-grow">
                           {ingredient.trim()}
                         </span>
                       </div>
@@ -246,9 +248,9 @@ const RecipeDetail = () => {
             </div>
 
             {/* Instructions */}
-            <div className="mb-8 bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold mb-4 text-gray-900">
-                Instructions
+            <div className="mb-8 bg-white rounded-2xl shadow-lg p-8 border border-orange-50 hover:shadow-xl transition-shadow">
+              <h2 className="text-3xl font-bold mb-6 text-gray-900 flex items-center gap-2">
+                👨‍🍳 Instructions
               </h2>
               <div className="space-y-4">
                 {recipe.instructions.split("\n").map(
@@ -256,12 +258,14 @@ const RecipeDetail = () => {
                     instruction.trim() && (
                       <div key={index} className="flex gap-4">
                         <div className="flex-shrink-0">
-                          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-orange-500 text-white font-bold">
+                          <div className="flex items-center justify-center h-10 w-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 text-white font-bold text-lg shadow-md">
                             {index + 1}
                           </div>
                         </div>
                         <div className="flex-grow">
-                          <p className="text-gray-700">{instruction.trim()}</p>
+                          <p className="text-gray-700 text-base leading-relaxed">
+                            {instruction.trim()}
+                          </p>
                         </div>
                       </div>
                     ),
@@ -270,16 +274,16 @@ const RecipeDetail = () => {
             </div>
 
             {/* Reviews */}
-            <div className="mb-8 bg-white rounded-lg shadow-md p-6">
+            <div className="mb-8 bg-white rounded-2xl shadow-lg p-8 border border-orange-50 hover:shadow-xl transition-shadow">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Reviews & Ratings ({recipe.ratings.length})
+                <h2 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
+                  ⭐ Reviews & Ratings ({recipe.ratings.length})
                 </h2>
                 {recipe.ratings.length > 0 && (
                   <select
                     value={ratingSort}
                     onChange={(e) => setRatingSort(e.target.value)}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                    className="px-4 py-2 text-sm border-2 border-orange-200 rounded-lg focus:ring-2 focus:ring-orange-500 font-medium bg-white"
                   >
                     <option value="recent">Most Recent</option>
                     <option value="highest">Highest Rated</option>
@@ -290,13 +294,15 @@ const RecipeDetail = () => {
               </div>
 
               {recipe.ratings.length > 0 && (
-                <div className="mb-6 p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg">
+                <div className="mb-8 p-6 bg-gradient-to-br from-orange-50 via-yellow-50 to-red-50 rounded-2xl border-2 border-orange-100 shadow-md">
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div className="text-center">
-                      <p className="text-3xl font-bold text-orange-600">
+                      <p className="text-4xl font-bold text-orange-600">
                         {recipe.avg_rating}
                       </p>
-                      <p className="text-sm text-gray-600">Average Rating</p>
+                      <p className="text-sm text-gray-700 font-medium">
+                        Average Rating
+                      </p>
                     </div>
                     {[5, 4, 3, 2, 1].map((stars) => {
                       const count = recipe.ratings.filter(
@@ -308,21 +314,25 @@ const RecipeDetail = () => {
                           : 0;
                       return (
                         <div key={stars} className="text-center">
-                          <div className="flex items-center mb-1">
+                          <div className="flex items-center justify-center mb-2">
                             {[...Array(stars)].map((_, i) => (
-                              <span key={i} className="text-yellow-500">
+                              <span key={i} className="text-lg">
                                 ⭐
                               </span>
                             ))}
                             {[...Array(5 - stars)].map((_, i) => (
-                              <span key={i + stars} className="text-gray-300">
+                              <span
+                                key={i + stars}
+                                className="text-lg text-gray-300"
+                              >
                                 ⭐
                               </span>
                             ))}
                           </div>
-                          <p className="text-xs text-gray-600">
-                            {percentage}% ({count})
+                          <p className="text-xs text-gray-700 font-bold">
+                            {percentage}%
                           </p>
+                          <p className="text-xs text-gray-600">({count})</p>
                         </div>
                       );
                     })}
@@ -333,7 +343,7 @@ const RecipeDetail = () => {
               {user && !ratingForm && (
                 <button
                   onClick={() => setRatingForm(true)}
-                  className="mb-6 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                  className="mb-6 px-6 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all font-bold"
                 >
                   ✍️ Write a Review
                 </button>
@@ -342,13 +352,13 @@ const RecipeDetail = () => {
               {ratingForm && user && (
                 <form
                   onSubmit={handleRatingSubmit}
-                  className="mb-6 p-4 bg-gray-50 rounded-lg border-l-4 border-orange-500"
+                  className="mb-6 p-6 bg-white rounded-2xl border-2 border-orange-200 shadow-lg"
                 >
-                  <h3 className="font-semibold text-gray-900 mb-4">
-                    Share Your Experience
+                  <h3 className="font-bold text-lg text-gray-900 mb-6 flex items-center gap-2">
+                    ⭐ Share Your Experience
                   </h3>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-gray-700 mb-3">
                       Rating
                     </label>
                     <div className="flex gap-2">
@@ -362,10 +372,10 @@ const RecipeDetail = () => {
                               rating: num,
                             })
                           }
-                          className={`text-3xl transition-transform ${
+                          className={`text-4xl transition-transform ${
                             ratingData.rating >= num
-                              ? "text-yellow-500 scale-110"
-                              : "text-gray-300 hover:text-yellow-300"
+                              ? "text-yellow-500 scale-125"
+                              : "text-gray-300 hover:text-yellow-300 hover:scale-110"
                           }`}
                         >
                           ⭐
@@ -373,9 +383,9 @@ const RecipeDetail = () => {
                       ))}
                     </div>
                   </div>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Your Review
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                      📝 Your Review
                     </label>
                     <textarea
                       value={ratingData.comment}
@@ -386,21 +396,21 @@ const RecipeDetail = () => {
                         })
                       }
                       rows="4"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
                       placeholder="Share your thoughts about this recipe..."
                     />
                   </div>
                   <div className="flex gap-2">
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium"
+                      className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all font-bold"
                     >
                       Submit Review
                     </button>
                     <button
                       type="button"
                       onClick={() => setRatingForm(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                      className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all font-medium"
                     >
                       Cancel
                     </button>
@@ -420,14 +430,14 @@ const RecipeDetail = () => {
                   .map((rating) => (
                     <div
                       key={rating.id}
-                      className="pb-4 border-b last:border-b-0 hover:bg-gray-50 p-3 -mx-3 px-3 rounded transition-colors"
+                      className="pb-4 border-b last:border-b-0 hover:bg-orange-50 p-4 -mx-4 px-4 rounded-lg transition-all shadow-sm hover:shadow-md"
                     >
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <p className="font-semibold text-gray-900">
+                          <p className="font-bold text-gray-900">
                             {rating.user_email}
                           </p>
-                          <p className="text-sm text-yellow-500 flex gap-1">
+                          <p className="text-lg flex gap-1">
                             {[...Array(rating.rating)].map((_, i) => (
                               <span key={i}>⭐</span>
                             ))}
@@ -441,7 +451,7 @@ const RecipeDetail = () => {
                             ))}
                           </p>
                         </div>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 font-medium">
                           {new Date(rating.created_at).toLocaleDateString(
                             "en-US",
                             {
@@ -453,7 +463,7 @@ const RecipeDetail = () => {
                         </p>
                       </div>
                       {rating.comment && (
-                        <p className="text-gray-700 text-sm mt-2">
+                        <p className="text-gray-700 text-sm mt-3 leading-relaxed">
                           {rating.comment}
                         </p>
                       )}
@@ -462,12 +472,14 @@ const RecipeDetail = () => {
               </div>
 
               {recipe.ratings.length === 0 && !ratingForm && (
-                <div className="text-center py-8 text-gray-500">
-                  <p className="mb-3">📝 Be the first to review this recipe!</p>
+                <div className="text-center py-12 text-gray-500">
+                  <p className="mb-4 text-lg font-medium">
+                    📝 Be the first to review this recipe!
+                  </p>
                   {user && (
                     <button
                       onClick={() => setRatingForm(true)}
-                      className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+                      className="px-6 py-3 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all font-bold"
                     >
                       Write First Review
                     </button>
@@ -480,45 +492,45 @@ const RecipeDetail = () => {
           {/* Sidebar */}
           <div>
             {/* Stats Card */}
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6 border border-orange-50 hover:shadow-xl transition-shadow">
               <div className="mb-6">
-                <div className="text-3xl font-bold text-orange-500">
+                <div className="text-4xl font-bold text-orange-600">
                   {recipe.avg_rating}⭐
                 </div>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-600 font-medium">
                   {recipe.ratings.length} ratings
                 </p>
               </div>
 
               <div className="space-y-4 mb-6 border-y py-4">
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">Difficulty</span>
-                  <span className="font-semibold text-gray-900 capitalize">
+                  <span className="text-gray-600 font-bold">🎯 Difficulty</span>
+                  <span className="font-bold text-gray-900 capitalize bg-blue-100 px-3 py-1 rounded-full text-xs">
                     {recipe.difficulty}
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">Prep Time</span>
-                  <span className="font-semibold text-gray-900">
+                  <span className="text-gray-600 font-bold">⏱️ Prep Time</span>
+                  <span className="font-bold text-gray-900">
                     {recipe.preparation_time}m
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">Cook Time</span>
-                  <span className="font-semibold text-gray-900">
+                  <span className="text-gray-600 font-bold">🍳 Cook Time</span>
+                  <span className="font-bold text-gray-900">
                     {recipe.cooking_time}m
                   </span>
                 </div>
                 <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-600">Servings</span>
-                  <span className="font-semibold text-gray-900">
+                  <span className="text-gray-600 font-bold">👥 Servings</span>
+                  <span className="font-bold text-gray-900">
                     {recipe.servings}
                   </span>
                 </div>
                 {recipe.calories && (
                   <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Calories</span>
-                    <span className="font-semibold text-gray-900">
+                    <span className="text-gray-600 font-bold">🔥 Calories</span>
+                    <span className="font-bold text-gray-900">
                       {recipe.calories}
                     </span>
                   </div>
@@ -527,22 +539,22 @@ const RecipeDetail = () => {
 
               {recipe.cuisine_type && (
                 <div className="mb-4">
-                  <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">
-                    {recipe.cuisine_type}
+                  <span className="inline-block px-4 py-2 bg-gradient-to-r from-blue-100 to-blue-50 text-blue-700 text-xs font-bold rounded-full border border-blue-200">
+                    🗺️ {recipe.cuisine_type}
                   </span>
                 </div>
               )}
 
               {recipe.dietary_tags && (
                 <div className="mb-4">
-                  <p className="text-sm text-gray-600 font-medium mb-2">
-                    Dietary Info
+                  <p className="text-sm text-gray-600 font-bold mb-3">
+                    🥗 Dietary Info
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {recipe.dietary_tags.split(",").map((tag, index) => (
                       <span
                         key={index}
-                        className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full"
+                        className="px-3 py-1 bg-gradient-to-r from-green-100 to-green-50 text-green-700 text-xs rounded-full font-bold border border-green-200"
                       >
                         {tag.trim()}
                       </span>
@@ -552,20 +564,20 @@ const RecipeDetail = () => {
               )}
 
               <div className="space-y-2 pt-4 border-t">
-                <p className="text-xs text-gray-500">
+                <p className="text-sm text-gray-600 font-bold">
                   👁️ {recipe.views_count} views
                 </p>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="bg-white rounded-lg shadow-md p-6 space-y-3">
+            <div className="bg-white rounded-2xl shadow-lg p-6 space-y-3 border border-orange-50">
               <button
                 onClick={handleLikeRecipe}
-                className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                className={`w-full py-3 rounded-lg font-bold transition-all hover:scale-105 ${
                   recipe.user_liked
-                    ? "bg-red-500 text-white hover:bg-red-600"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    ? "bg-gradient-to-r from-red-500 to-pink-600 text-white hover:shadow-lg"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-200"
                 }`}
               >
                 ❤️ {recipe.likes_count} {recipe.user_liked ? "Liked" : "Like"}
@@ -573,10 +585,10 @@ const RecipeDetail = () => {
 
               <button
                 onClick={() => handleToggleFavorite(recipe)}
-                className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                className={`w-full py-3 rounded-lg font-bold transition-all hover:scale-105 ${
                   isFavoriteRecipe(recipe.id)
-                    ? "bg-yellow-400 text-gray-900 hover:bg-yellow-500"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    ? "bg-gradient-to-r from-yellow-400 to-orange-500 text-gray-900 hover:shadow-lg"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200 border-2 border-gray-200"
                 }`}
               >
                 ⭐ {isFavoriteRecipe(recipe.id) ? "Saved" : "Save Recipe"}
@@ -586,7 +598,7 @@ const RecipeDetail = () => {
                 <>
                   <button
                     onClick={() => navigate(`/recipes/${id}/edit`)}
-                    className="w-full py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium transition-colors"
+                    className="w-full py-3 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all font-bold"
                   >
                     ✏️ Edit Recipe
                   </button>
@@ -600,7 +612,7 @@ const RecipeDetail = () => {
                         handleDeleteRecipe(id);
                       }
                     }}
-                    className="w-full py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium transition-colors"
+                    className="w-full py-3 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all font-bold"
                   >
                     🗑️ Delete Recipe
                   </button>

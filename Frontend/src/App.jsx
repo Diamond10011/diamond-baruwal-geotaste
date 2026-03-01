@@ -22,6 +22,7 @@ import Profile from "./pages/Profile/Profile";
 import Recipes from "./pages/Recipes";
 import RecipeDetail from "./pages/RecipeDetail";
 import Favorites from "./pages/Favorites";
+import Recommendations from "./pages/Recommendations";
 import RestaurantSearch from "./pages/RestaurantSearch";
 import RestaurantProfile from "./pages/RestaurantProfile";
 import Stores from "./pages/Stores";
@@ -105,6 +106,7 @@ export default function App() {
             <Route path="/recipes" element={<Recipes />} />
             <Route path="/recipes/:id" element={<RecipeDetail />} />
             <Route path="/favorites" element={<Favorites />} />
+            <Route path="/recommendations" element={<Recommendations />} />
 
             {/* Restaurant Routes */}
             <Route path="/restaurants" element={<RestaurantSearch />} />

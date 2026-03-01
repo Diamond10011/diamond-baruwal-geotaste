@@ -14,7 +14,10 @@ from .views import (
     # Order endpoints
     orders, order_detail,
     # Payment endpoints
-    process_payment, payment_detail
+    process_payment, payment_detail,
+    # Recommendation endpoints
+    recommend_recipes, popular_recipes, recommend_restaurants, popular_restaurants,
+    trending_recipes, user_recommendations_summary
 )
 
 urlpatterns = [
@@ -68,4 +71,12 @@ urlpatterns = [
     # ==================== PAYMENTS ====================
     path('payments/process/', process_payment, name='process_payment'),
     path('payments/<str:payment_id>/', payment_detail, name='payment_detail'),
+    
+    # ==================== RECOMMENDATIONS ====================
+    path('recommendations/recipes/', recommend_recipes, name='recommend_recipes'),
+    path('recommendations/recipes/popular/', popular_recipes, name='popular_recipes'),
+    path('recommendations/recipes/trending/', trending_recipes, name='trending_recipes'),
+    path('recommendations/restaurants/', recommend_restaurants, name='recommend_restaurants'),
+    path('recommendations/restaurants/popular/', popular_restaurants, name='popular_restaurants'),
+    path('recommendations/summary/', user_recommendations_summary, name='recommendations_summary'),
 ]
