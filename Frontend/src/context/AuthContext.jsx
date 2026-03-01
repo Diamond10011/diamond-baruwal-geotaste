@@ -281,18 +281,30 @@ const AuthProvider = ({ children }) => {
   }, [tokens]);
 
   const updateProfile = useCallback(
-    async (profileData) => {
+    async (profileData, photoFile = null) => {
       if (!tokens?.access) throw new Error("Not authenticated");
       setLoading(true);
       setError(null);
       try {
-        const response = await axios.put(
-          `${API_BASE_URL}/profile/`,
-          profileData,
-          {
-            headers: { Authorization: `Bearer ${tokens.access}` },
-          },
-        );
+        let data = profileData;
+        let headers = { Authorization: `Bearer ${tokens.access}` };
+
+        // If there's a file, use FormData
+        if (photoFile) {
+          const formData = new FormData();
+          formData.append("first_name", profileData.first_name);
+          formData.append("last_name", profileData.last_name);
+          formData.append("phone_number", profileData.phone_number);
+          formData.append("location", profileData.location);
+          formData.append("bio", profileData.bio);
+          formData.append("profile_photo", photoFile);
+          data = formData;
+          // Don't set Content-Type, let the browser set it automatically
+        }
+
+        const response = await axios.put(`${API_BASE_URL}/profile/`, data, {
+          headers,
+        });
         setProfile(response.data.profile);
         localStorage.setItem("profile", JSON.stringify(response.data.profile));
         setUser((prevUser) => ({
@@ -389,17 +401,12 @@ const AuthProvider = ({ children }) => {
 
   const addRestaurantToFavorites = useCallback((restaurant) => {
     setFavorites((prev) => {
-      const isAlreadyFav = prev.restaurants.some(
-        (r) => r.id === restaurant.id,
-      );
+      const isAlreadyFav = prev.restaurants.some((r) => r.id === restaurant.id);
       if (isAlreadyFav) {
         return prev;
       }
       const newFavorites = [...prev.restaurants, restaurant];
-      localStorage.setItem(
-        "favoriteRestaurants",
-        JSON.stringify(newFavorites),
-      );
+      localStorage.setItem("favoriteRestaurants", JSON.stringify(newFavorites));
       return {
         ...prev,
         restaurants: newFavorites,
@@ -424,8 +431,7 @@ const AuthProvider = ({ children }) => {
   );
 
   const isFavoriteRestaurant = useCallback(
-    (restaurantId) =>
-      favorites.restaurants.some((r) => r.id === restaurantId),
+    (restaurantId) => favorites.restaurants.some((r) => r.id === restaurantId),
     [favorites.restaurants],
   );
 

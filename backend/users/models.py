@@ -68,7 +68,7 @@ class UserProfile(models.Model):
     last_name = models.CharField(max_length=100, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
     location = models.CharField(max_length=255, blank=True)
-    profile_photo = models.URLField(blank=True, null=True, help_text="URL to profile photo")
+    profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True, help_text="User profile photo")
     bio = models.TextField(blank=True)
     dark_mode = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

@@ -260,12 +260,24 @@ class ChangePasswordSerializer(serializers.Serializer):
         return value
 
 
+class UserProfileNestedSerializer(serializers.ModelSerializer):
+    """Simplified serializer for UserProfile (used for nesting in UserSerializer)"""
+    class Meta:
+        model = UserProfile
+        fields = [
+            'id', 'first_name', 'last_name', 
+            'phone_number', 'location', 'profile_photo', 'bio', 'dark_mode'
+        ]
+
+
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for CustomUser"""
+    """Serializer for CustomUser with nested profile"""
+    profile = UserProfileNestedSerializer(read_only=True)
+    
     class Meta:
         model = CustomUser
-        fields = ['id', 'email', 'role', 'is_email_verified', 'is_admin', 'created_at']
-        read_only_fields = ['id', 'is_email_verified', 'is_admin', 'created_at']
+        fields = ['id', 'email', 'role', 'is_email_verified', 'is_admin', 'created_at', 'profile']
+        read_only_fields = ['id', 'is_email_verified', 'is_admin', 'created_at', 'profile']
 
 
 class UserProfileSerializer(serializers.ModelSerializer):

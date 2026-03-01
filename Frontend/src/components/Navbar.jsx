@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-
+import logo from "../assets/Image/GeoTasteLogo.png"
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -47,18 +47,22 @@ const Navbar = () => {
     }`;
 
   return (
-    <nav className="bg-white/80 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100">
+    <nav className="bg-amber-100 backdrop-blur-md sticky top-0 z-50 border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           
           {/* Brand Logo */}
           <Link to="/home" className="flex items-center gap-2 group">
-            <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-xl shadow-lg shadow-orange-200 group-hover:scale-110 transition-transform">
+
+            {/* <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-xl shadow-lg shadow-orange-200 group-hover:scale-110 transition-transform">
               🍽️
-            </div>
-            <span className="text-2xl font-black tracking-tight bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+            </div> */}
+             <div className="flex items-center pt-2 ml-8">
+                          <img src={logo} alt="GeoTaste Logo" className="h-16 rounded-full" />
+                        </div>
+            {/* <span className="text-2xl font-black tracking-tight bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
               GeoTaste
-            </span>
+            </span> */}
           </Link>
 
           {/* Desktop Menu */}
