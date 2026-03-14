@@ -238,30 +238,104 @@ const Favorites = () => {
         )}
 
         {/* Improved Empty State */}
-        {((activeTab === "recipes" && filteredRecipes.length === 0) ||
-          (activeTab === "restaurants" &&
-            filteredRestaurants.length === 0)) && (
-          <div className="bg-white rounded-[40px] border border-dashed border-slate-300 p-20 text-center">
-            <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Search className="w-10 h-10 text-slate-300" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">
-              No results found
-            </h3>
-            <p className="text-slate-500 mb-8 max-w-xs mx-auto">
-              We couldn't find any favorites matching your current search or
-              filters.
-            </p>
-            <button
-              onClick={() => {
-                setSearchTerm("");
-                setSortBy("newest");
-              }}
-              className="text-indigo-600 font-bold hover:underline"
-            >
-              Clear all filters
-            </button>
-          </div>
+        {/* Dynamic Empty States */}
+
+        {/* --- Recipes Empty States --- */}
+        {activeTab === "recipes" && (
+          <>
+            {favorites.recipes.length === 0 ? (
+              // State 1: Absolutely no favorites saved yet
+              <div className="bg-white rounded-[40px] border border-dashed border-slate-300 p-20 text-center">
+                <div className="w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <ChefHat className="w-10 h-10 text-indigo-400" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">
+                  No favorite recipes yet
+                </h3>
+                <p className="text-slate-500 mb-8 max-w-sm mx-auto">
+                  Your recipe book is empty! Start exploring and save your
+                  favorite dishes here.
+                </p>
+                <button
+                  onClick={() => navigate("/recipes")}
+                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+                >
+                  Browse Recipes
+                </button>
+              </div>
+            ) : filteredRecipes.length === 0 ? (
+              // State 2: User has favorites, but search yielded no results
+              <div className="bg-white rounded-[40px] border border-dashed border-slate-300 p-20 text-center">
+                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Search className="w-10 h-10 text-slate-300" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">
+                  No results found
+                </h3>
+                <p className="text-slate-500 mb-8 max-w-xs mx-auto">
+                  We couldn't find any recipes matching "{searchTerm}".
+                </p>
+                <button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSortBy("newest");
+                  }}
+                  className="text-indigo-600 font-bold hover:underline"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            ) : null}
+          </>
+        )}
+
+        {/* --- Restaurants Empty States --- */}
+        {activeTab === "restaurants" && (
+          <>
+            {favorites.restaurants.length === 0 ? (
+              // State 1: Absolutely no favorites saved yet
+              <div className="bg-white rounded-[40px] border border-dashed border-slate-300 p-20 text-center">
+                <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Utensils className="w-10 h-10 text-orange-400" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">
+                  No favorite restaurants yet
+                </h3>
+                <p className="text-slate-500 mb-8 max-w-sm mx-auto">
+                  Keep track of your go-to dining spots by adding them to your
+                  favorites list.
+                </p>
+                <button
+                  onClick={() => navigate("/restaurants")}
+                  className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+                >
+                  Discover Restaurants
+                </button>
+              </div>
+            ) : filteredRestaurants.length === 0 ? (
+              // State 2: User has favorites, but search yielded no results
+              <div className="bg-white rounded-[40px] border border-dashed border-slate-300 p-20 text-center">
+                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Search className="w-10 h-10 text-slate-300" />
+                </div>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">
+                  No results found
+                </h3>
+                <p className="text-slate-500 mb-8 max-w-xs mx-auto">
+                  We couldn't find any restaurants matching "{searchTerm}".
+                </p>
+                <button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSortBy("newest");
+                  }}
+                  className="text-indigo-600 font-bold hover:underline"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
     </div>
