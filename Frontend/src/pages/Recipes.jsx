@@ -581,126 +581,210 @@ const Recipes = () => {
             {filteredRecipes.map((recipe) => (
               <div
                 key={recipe.id}
-                className="bg-white rounded-2xl shadow-lg hover:shadow-2xl overflow-hidden transition-all duration-300 hover:scale-105 border border-orange-50"
+                className="group bg-white rounded-3xl shadow-lg hover:shadow-2xl overflow-hidden transition-all duration-300 border border-gray-100 hover:border-orange-200"
               >
-                {/* Recipe Image */}
-                {recipe.recipe_image && (
-                  <img
-                    src={recipe.recipe_image}
-                    alt={recipe.title}
-                    className="w-full h-56 object-cover hover:scale-110 transition-transform duration-500"
-                  />
-                )}
+                {/* Image Container with Overlay */}
+                <div className="relative h-72 overflow-hidden bg-gradient-to-br from-orange-100 to-orange-50">
+                  {recipe.recipe_image ? (
+                    <>
+                      <img
+                        src={recipe.recipe_image}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      />
+                      {/* Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    </>
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-6xl opacity-30">
+                      🍳
+                    </div>
+                  )}
 
+                  {/* Difficulty Badge */}
+                  <div className="absolute top-4 right-4">
+                    <span
+                      className={`inline-block px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide shadow-lg backdrop-blur-md ${
+                        recipe.difficulty === "easy"
+                          ? "bg-green-500/90 text-white"
+                          : recipe.difficulty === "medium"
+                            ? "bg-yellow-500/90 text-white"
+                            : "bg-red-500/90 text-white"
+                      }`}
+                    >
+                      {recipe.difficulty === "easy"
+                        ? "🟢 Easy"
+                        : recipe.difficulty === "medium"
+                          ? "🟡 Medium"
+                          : "🔴 Hard"}
+                    </span>
+                  </div>
+
+                  {/* Rating Badge */}
+                  <div className="absolute top-4 left-4 bg-white/95 backdrop-blur-md rounded-full px-3 py-2 shadow-lg">
+                    <div className="flex items-center gap-1">
+                      <span className="text-lg">⭐</span>
+                      <span className="font-bold text-gray-900">
+                        {recipe.avg_rating}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Like and Favorite Buttons (on hover) */}
+                  <div className="absolute bottom-4 right-4 flex gap-3 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+                    <button
+                      onClick={() => handleLikeRecipe(recipe.id)}
+                      className={`backdrop-blur-md rounded-full p-3 transition-all hover:scale-110 ${
+                        recipe.user_liked
+                          ? "bg-red-500/90 text-white"
+                          : "bg-white/90 text-gray-700 hover:bg-red-500/90 hover:text-white"
+                      }`}
+                      title="Like recipe"
+                    >
+                      ❤️
+                    </button>
+                    <button
+                      onClick={() => handleToggleFavorite(recipe)}
+                      className={`backdrop-blur-md rounded-full p-3 transition-all hover:scale-110 ${
+                        isFavoriteRecipe(recipe.id)
+                          ? "bg-yellow-500/90 text-white"
+                          : "bg-white/90 text-gray-700 hover:bg-yellow-500/90 hover:text-white"
+                      }`}
+                      title="Save to favorites"
+                    >
+                      ⭐
+                    </button>
+                  </div>
+                </div>
+
+                {/* Content */}
                 <div className="p-6">
                   {/* Title */}
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 hover:text-orange-600 transition-colors">
+                  <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2 hover:text-orange-600 transition-colors">
                     {recipe.title}
                   </h3>
 
                   {/* Author */}
-                  <p className="text-sm text-gray-500 mb-4 flex items-center gap-1">
-                    👤 {recipe.author_name || recipe.author_email}
-                  </p>
+                  <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-orange-400 to-pink-500 flex items-center justify-center text-white text-sm font-bold">
+                      {recipe.author_name
+                        ? recipe.author_name.charAt(0).toUpperCase()
+                        : recipe.author_email.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">
+                        {recipe.author_name || recipe.author_email}
+                      </p>
+                      <p className="text-xs text-gray-500">Shared by Author</p>
+                    </div>
+                  </div>
 
                   {/* Description */}
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-2 leading-relaxed">
                     {recipe.description}
                   </p>
 
-                  {/* Meta Info */}
-                  <div className="flex flex-wrap gap-2 mb-5">
-                    <span className="inline-block px-3 py-1 bg-gradient-to-r from-orange-100 to-orange-50 text-orange-700 text-xs rounded-full font-semibold shadow-sm capitalize">
-                      {recipe.difficulty}
-                    </span>
+                  {/* Cuisine & Dietary Tags */}
+                  <div className="flex flex-wrap gap-2 mb-4">
                     {recipe.cuisine_type && (
-                      <span className="inline-block px-3 py-1 bg-gradient-to-r from-blue-100 to-blue-50 text-blue-700 text-xs rounded-full font-semibold shadow-sm">
-                        {recipe.cuisine_type}
+                      <span className="inline-block px-3 py-1 bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 text-xs rounded-full font-semibold shadow-sm hover:shadow-md transition-shadow">
+                        🌍 {recipe.cuisine_type}
                       </span>
                     )}
+                    {recipe.dietary_tags &&
+                      recipe.dietary_tags
+                        .split(",")
+                        .slice(0, 2)
+                        .map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-block px-3 py-1 bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 text-xs rounded-full font-semibold shadow-sm hover:shadow-md transition-shadow"
+                          >
+                            🌱 {tag.trim()}
+                          </span>
+                        ))}
                   </div>
 
-                  {/* Time & Servings */}
-                  <div className="grid grid-cols-3 gap-2 text-xs text-gray-500 mb-5 pb-5 border-b border-gray-100">
+                  {/* Time & Servings Grid */}
+                  <div className="grid grid-cols-3 gap-3 my-5 p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-xl">
                     <div className="text-center">
+                      <p className="text-2xl mb-1">⏱️</p>
                       <p className="font-bold text-gray-800 text-sm">
                         {recipe.preparation_time}m
                       </p>
-                      <p className="text-gray-500">Prep</p>
+                      <p className="text-xs text-gray-600 uppercase tracking-wide">
+                        Prep
+                      </p>
                     </div>
-                    <div className="text-center">
+                    <div className="text-center border-l border-r border-gray-200">
+                      <p className="text-2xl mb-1">🔥</p>
                       <p className="font-bold text-gray-800 text-sm">
                         {recipe.cooking_time}m
                       </p>
-                      <p className="text-gray-500">Cook</p>
+                      <p className="text-xs text-gray-600 uppercase tracking-wide">
+                        Cook
+                      </p>
                     </div>
                     <div className="text-center">
+                      <p className="text-2xl mb-1">👥</p>
                       <p className="font-bold text-gray-800 text-sm">
                         {recipe.servings}
                       </p>
-                      <p className="text-gray-500">Servings</p>
+                      <p className="text-xs text-gray-600 uppercase tracking-wide">
+                        Serves
+                      </p>
                     </div>
                   </div>
 
-                  {/* Stats */}
-                  <div className="flex justify-between items-center mb-5 text-sm">
-                    <div>
-                      <p className="text-gray-700 font-semibold">
-                        ⭐ {recipe.avg_rating}{" "}
-                        <span className="text-gray-500 font-normal">
-                          ({recipe.rating_count})
-                        </span>
-                      </p>
-                      <p className="text-gray-500">
-                        👁️ {recipe.views_count} views
+                  {/* Calories if available */}
+                  {recipe.calories && (
+                    <div className="mb-4 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                      <p className="text-sm font-semibold text-amber-900">
+                        🔥 {recipe.calories} cal per serving
                       </p>
                     </div>
-                    <div className="flex gap-3">
-                      <button
-                        onClick={() => handleLikeRecipe(recipe.id)}
-                        className={`${
-                          recipe.user_liked
-                            ? "text-red-600"
-                            : "text-gray-400 hover:text-red-600"
-                        } transition-colors text-xl whitespace-nowrap transform hover:scale-125`}
-                      >
-                        ❤️ {recipe.likes_count}
-                      </button>
-                      <button
-                        onClick={() => handleToggleFavorite(recipe)}
-                        className={`transition-colors text-xl whitespace-nowrap transform hover:scale-125 ${
-                          isFavoriteRecipe(recipe.id)
-                            ? "text-yellow-500"
-                            : "text-gray-400 hover:text-yellow-500"
-                        }`}
-                      >
-                        ⭐
-                      </button>
+                  )}
+
+                  {/* Stats Row */}
+                  <div className="flex justify-between items-center mb-5 py-3 border-t border-b border-gray-100">
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="font-semibold text-gray-800 flex items-center gap-1">
+                        <span>({recipe.rating_count})</span>
+                        reviews
+                      </span>
+                      <span className="text-gray-500 flex items-center gap-1">
+                        👁️ {recipe.views_count}
+                      </span>
                     </div>
+                    <span className="text-sm font-bold text-red-500 flex items-center gap-1">
+                      ❤️ {recipe.likes_count}
+                    </span>
                   </div>
 
-                  {/* Actions */}
+                  {/* Action Buttons */}
                   <div className="flex gap-2 pt-2">
                     <button
                       onClick={() => navigate(`/recipes/${recipe.id}`)}
-                      className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-red-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all text-sm font-bold"
+                      className="flex-1 px-4 py-3 bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 text-white rounded-xl hover:shadow-lg hover:from-orange-600 hover:to-red-700 transition-all text-sm font-bold transform hover:scale-105 active:scale-95"
                     >
-                      View Details
+                      👀 View Details
                     </button>
 
                     {user?.email === recipe.author_email && (
                       <>
                         <button
                           onClick={() => setEditingId(recipe.id)}
-                          className="px-3 py-2 border-2 border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 text-sm font-medium transition-all hover:scale-105"
+                          className="px-4 py-3 border-2 border-blue-400 text-blue-600 rounded-xl hover:bg-blue-50 text-sm font-bold transition-all hover:shadow-md active:scale-95"
+                          title="Edit recipe"
                         >
-                          Edit
+                          ✏️
                         </button>
                         <button
                           onClick={() => handleDeleteRecipe(recipe.id)}
-                          className="px-3 py-2 border-2 border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium transition-all hover:scale-105"
+                          className="px-4 py-3 border-2 border-red-400 text-red-600 rounded-xl hover:bg-red-50 text-sm font-bold transition-all hover:shadow-md active:scale-95"
+                          title="Delete recipe"
                         >
-                          Delete
+                          🗑️
                         </button>
                       </>
                     )}
