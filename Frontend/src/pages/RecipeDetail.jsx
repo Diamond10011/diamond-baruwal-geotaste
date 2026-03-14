@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import axios from "axios";
-import { Alert } from "../components/FormComponents";
+import { Alert, FormInput, FormButton } from "../components/FormComponents";
 
 const API_BASE_URL = "http://localhost:8000/api";
 
@@ -11,6 +11,7 @@ const RecipeDetail = () => {
   const navigate = useNavigate();
   const {
     user,
+    tokens,
     isFavoriteRecipe,
     addRecipeToFavorites,
     removeRecipeFromFavorites,
@@ -19,28 +20,65 @@ const RecipeDetail = () => {
   const [recipe, setRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState("");
   const [ratingForm, setRatingForm] = useState(null);
   const [ratingData, setRatingData] = useState({ rating: 5, comment: "" });
   const [userRating, setUserRating] = useState(null);
-  const [successMessage, setSuccessMessage] = useState("");
   const [ratingSort, setRatingSort] = useState("recent");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingLoading, setEditingLoading] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    title: "",
+    description: "",
+    ingredients: "",
+    instructions: "",
+    difficulty: "medium",
+    cuisine_type: "",
+    preparation_time: 30,
+    cooking_time: 30,
+    servings: 4,
+    recipe_image: "",
+    recipe_video: "",
+    calories: "",
+    dietary_tags: "",
+  });
+  const [validationErrors, setValidationErrors] = useState({});
 
   useEffect(() => {
     fetchRecipeDetails();
   }, [id]);
 
   const fetchRecipeDetails = async () => {
+    const accessToken = tokens?.access || localStorage.getItem("access_token");
+    if (!accessToken) {
+      setError("Not authenticated. Please log in again.");
+      setRecipe(null);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/recipes/${id}/`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
       setRecipe(response.data);
       setUserRating(response.data.user_rating);
       setError(null);
     } catch (err) {
-      setError("Failed to load recipe details");
+      console.error("Recipe detail error:", err.response?.data || err.message);
+      const status = err.response?.status;
+      const data = err.response?.data;
+      setError(
+        data?.error ||
+          data?.message ||
+          data?.detail ||
+          (status === 401
+            ? "Your session expired. Please log in again."
+            : "Failed to load recipe details"),
+      );
     } finally {
       setLoading(false);
     }
@@ -56,27 +94,34 @@ const RecipeDetail = () => {
 
   const handleLikeRecipe = async () => {
     try {
+      const accessToken = tokens?.access || localStorage.getItem("access_token");
       await axios.post(
         `${API_BASE_URL}/recipes/${id}/like/`,
         {},
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         },
       );
       fetchRecipeDetails();
     } catch (err) {
-      setError("Failed to like recipe");
+      console.error("Like recipe error:", err.response?.data || err.message);
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Failed to like recipe",
+      );
     }
   };
 
   const handleRatingSubmit = async (e) => {
     e.preventDefault();
     try {
+      const accessToken = tokens?.access || localStorage.getItem("access_token");
       await axios.post(`${API_BASE_URL}/recipes/${id}/rating/`, ratingData, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
       setSuccessMessage("Rating saved successfully!");
@@ -85,21 +130,117 @@ const RecipeDetail = () => {
       fetchRecipeDetails();
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
-      setError("Failed to save rating");
+      console.error("Rating error:", err.response?.data || err.message);
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Failed to save rating",
+      );
     }
   };
 
   const handleDeleteRecipe = async (recipeId) => {
     try {
+      const accessToken = tokens?.access || localStorage.getItem("access_token");
       await axios.delete(`${API_BASE_URL}/recipes/${recipeId}/`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("access_token")}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       });
       setSuccessMessage("Recipe deleted successfully!");
       setTimeout(() => navigate("/recipes"), 2000);
     } catch (err) {
-      setError("Failed to delete recipe");
+      console.error("Delete recipe error:", err.response?.data || err.message);
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Failed to delete recipe",
+      );
+    }
+  };
+
+  const startEditing = () => {
+    if (!recipe) return;
+    setEditFormData({
+      title: recipe.title,
+      description: recipe.description,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+      difficulty: recipe.difficulty,
+      cuisine_type: recipe.cuisine_type,
+      preparation_time: recipe.preparation_time,
+      cooking_time: recipe.cooking_time,
+      servings: recipe.servings,
+      recipe_image: recipe.recipe_image || "",
+      recipe_video: recipe.recipe_video || "",
+      calories: recipe.calories || "",
+      dietary_tags: recipe.dietary_tags || "",
+    });
+    setIsEditing(true);
+    setValidationErrors({});
+  };
+
+  const validateForm = () => {
+    const errors = {};
+    if (!editFormData.title.trim()) errors.title = "Title is required";
+    if (!editFormData.description.trim())
+      errors.description = "Description is required";
+    if (!editFormData.ingredients.trim())
+      errors.ingredients = "Ingredients are required";
+    if (!editFormData.instructions.trim())
+      errors.instructions = "Instructions are required";
+    if (editFormData.preparation_time < 0)
+      errors.preparation_time = "Invalid time";
+    if (editFormData.cooking_time < 0) errors.cooking_time = "Invalid time";
+    if (editFormData.servings < 1)
+      errors.servings = "Servings must be at least 1";
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData((prev) => ({ ...prev, [name]: value }));
+    if (validationErrors[name]) {
+      setValidationErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setEditingLoading(true);
+    try {
+      const accessToken = tokens?.access || localStorage.getItem("access_token");
+      const response = await axios.put(
+        `${API_BASE_URL}/recipes/${id}/`,
+        editFormData,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+
+      setSuccessMessage("Recipe updated successfully!");
+      // Backend wraps the recipe in response.data.recipe
+      setRecipe(response.data.recipe || response.data);
+      setIsEditing(false);
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      console.error("Edit recipe error:", err.response?.data || err.message);
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Failed to update recipe",
+      );
+    } finally {
+      setEditingLoading(false);
     }
   };
 
@@ -148,6 +289,213 @@ const RecipeDetail = () => {
         >
           Back to Recipes
         </button>
+      </div>
+    );
+  }
+
+  if (isEditing && user?.email === recipe.author_email) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-orange-50 to-amber-50">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-orange-500 via-orange-600 to-red-600 text-white py-12 shadow-2xl">
+          <div className="max-w-6xl mx-auto px-4">
+            <h1 className="text-5xl font-bold mb-2 tracking-tight">
+              ✏️ Edit Recipe
+            </h1>
+            <p className="text-orange-100">Update your recipe details</p>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          {error && (
+            <Alert
+              message={error}
+              type="error"
+              onClose={() => setError(null)}
+            />
+          )}
+          {successMessage && (
+            <Alert
+              message={successMessage}
+              type="success"
+              onClose={() => setSuccessMessage("")}
+            />
+          )}
+
+          <div className="bg-white rounded-2xl shadow-2xl p-8 border border-orange-100">
+            <form onSubmit={handleEditSubmit} className="space-y-6">
+              <FormInput
+                label="Recipe Title"
+                name="title"
+                value={editFormData.title}
+                onChange={handleEditChange}
+                error={validationErrors.title}
+                placeholder="e.g., Chocolate Chip Cookies"
+                required
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  name="description"
+                  value={editFormData.description}
+                  onChange={handleEditChange}
+                  rows="3"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  placeholder="Tell us about your recipe..."
+                />
+                {validationErrors.description && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {validationErrors.description}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ingredients (one per line)
+                </label>
+                <textarea
+                  name="ingredients"
+                  value={editFormData.ingredients}
+                  onChange={handleEditChange}
+                  rows="6"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  placeholder="2 cups flour&#10;1 cup sugar&#10;3 eggs&#10;..."
+                />
+                {validationErrors.ingredients && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {validationErrors.ingredients}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Instructions
+                </label>
+                <textarea
+                  name="instructions"
+                  value={editFormData.instructions}
+                  onChange={handleEditChange}
+                  rows="6"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  placeholder="Step 1: ...&#10;Step 2: ...&#10;..."
+                />
+                {validationErrors.instructions && (
+                  <p className="mt-1 text-sm text-red-600">
+                    {validationErrors.instructions}
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Difficulty
+                  </label>
+                  <select
+                    name="difficulty"
+                    value={editFormData.difficulty}
+                    onChange={handleEditChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500"
+                  >
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </div>
+
+                <FormInput
+                  label="Prep Time (min)"
+                  name="preparation_time"
+                  type="number"
+                  value={editFormData.preparation_time}
+                  onChange={handleEditChange}
+                  error={validationErrors.preparation_time}
+                />
+
+                <FormInput
+                  label="Cook Time (min)"
+                  name="cooking_time"
+                  type="number"
+                  value={editFormData.cooking_time}
+                  onChange={handleEditChange}
+                  error={validationErrors.cooking_time}
+                />
+
+                <FormInput
+                  label="Servings"
+                  name="servings"
+                  type="number"
+                  value={editFormData.servings}
+                  onChange={handleEditChange}
+                  error={validationErrors.servings}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormInput
+                  label="Cuisine Type"
+                  name="cuisine_type"
+                  value={editFormData.cuisine_type}
+                  onChange={handleEditChange}
+                  placeholder="e.g., Italian, Asian"
+                />
+
+                <FormInput
+                  label="Calories (optional)"
+                  name="calories"
+                  type="number"
+                  value={editFormData.calories}
+                  onChange={handleEditChange}
+                />
+              </div>
+
+              <FormInput
+                label="Recipe Image URL"
+                name="recipe_image"
+                type="url"
+                value={editFormData.recipe_image}
+                onChange={handleEditChange}
+                placeholder="https://..."
+              />
+
+              <FormInput
+                label="Recipe Video URL (optional)"
+                name="recipe_video"
+                type="url"
+                value={editFormData.recipe_video}
+                onChange={handleEditChange}
+                placeholder="https://youtube.com/... or https://vimeo.com/..."
+              />
+
+              <FormInput
+                label="Dietary Tags"
+                name="dietary_tags"
+                value={editFormData.dietary_tags}
+                onChange={handleEditChange}
+                placeholder="e.g., vegan, gluten-free, low-carb"
+              />
+
+              <div className="flex gap-4">
+                <FormButton loading={editingLoading} type="submit">
+                  Update Recipe
+                </FormButton>
+                <button
+                  type="button"
+                  onClick={() => setIsEditing(false)}
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       </div>
     );
   }
@@ -597,7 +945,7 @@ const RecipeDetail = () => {
               {user?.email === recipe.author_email && (
                 <>
                   <button
-                    onClick={() => navigate(`/recipes/${id}/edit`)}
+                    onClick={startEditing}
                     className="w-full py-3 bg-gradient-to-r from-blue-500 to-cyan-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all font-bold"
                   >
                     ✏️ Edit Recipe

@@ -2,6 +2,8 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Alert } from "../../components/FormComponents";
+import logo from "../../assets/Image/GeoTasteLogo.png";
+import { Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -16,10 +18,12 @@ const Login = () => {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
+  // Logic to check if button should be enabled
+  const isFormFilled = formData.email.trim() !== "" && formData.password !== "";
+
   // ============================================================================
   // VALIDATION
   // ============================================================================
-
   const validateForm = () => {
     const errors = {};
 
@@ -40,7 +44,6 @@ const Login = () => {
   // ============================================================================
   // HANDLERS
   // ============================================================================
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -48,7 +51,6 @@ const Login = () => {
       [name]: value,
     }));
 
-    // Clear error when user starts typing
     if (formErrors[name]) {
       setFormErrors((prev) => ({
         ...prev,
@@ -67,14 +69,12 @@ const Login = () => {
     try {
       const response = await loginUser(formData.email, formData.password);
 
-      // Store remember me preference
       if (rememberMe) {
         localStorage.setItem("rememberedEmail", formData.email);
       } else {
         localStorage.removeItem("rememberedEmail");
       }
 
-      // Role-based redirection
       const role = response.user.role;
       switch (role) {
         case "admin":
@@ -90,7 +90,6 @@ const Login = () => {
           navigate("/home");
       }
     } catch (err) {
-      // Check if error is due to unverified email
       if (err.response?.data?.require_email_verification) {
         navigate("/verify-email", {
           state: { email: formData.email },
@@ -99,7 +98,6 @@ const Login = () => {
     }
   };
 
-  // Load remembered email on mount
   React.useEffect(() => {
     const rememberedEmail = localStorage.getItem("rememberedEmail");
     if (rememberedEmail) {
@@ -114,43 +112,97 @@ const Login = () => {
   return (
     <div className="min-h-screen flex items-stretch">
       {/* Left Sidebar */}
-      <div className="hidden md:flex md:w-1/2 bg-gradient-to-b from-orange-500 to-orange-600 text-white flex-col justify-between p-12">
-        {/* Branding */}
-        <div>
-          <div className="flex items-center gap-3 mb-12">
-            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-              <span className="text-orange-600 text-xl font-bold">🍳</span>
+      <div className="hidden md:flex md:w-1/2 relative overflow-hidden bg-gradient-to-br from-orange-500 via-orange-600 to-red-500 text-white flex-col justify-between px-12 py-14 lg:px-16 lg:py-16">
+        {/* Decorative Background Blurs */}
+        <div className="absolute -top-24 -left-24 w-80 h-80 bg-white/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-red-900/10 rounded-full blur-3xl"></div>
+        <div className="absolute top-1/3 right-10 w-40 h-40 bg-white/5 rounded-full blur-2xl"></div>
+
+        {/* Top Content */}
+        <div className="relative z-10">
+          {/* Branding */}
+          <div className="flex items-center gap-4 mb-16">
+            <div className="w-14 h-14 bg-white/95 rounded-2xl shadow-xl flex items-center justify-center ring-1 ring-white/30">
+              <img
+                src={logo}
+                alt="GeoTaste Logo"
+                className="w-10 h-10 object-cover rounded-full"
+              />
             </div>
-            <h1 className="text-2xl font-bold">GeoTaste</h1>
+
+            <div>
+              <h1 className="text-3xl font-extrabold tracking-tight">
+                GeoTaste
+              </h1>
+              <p className="text-sm text-white/80 font-medium">
+                Discover flavor everywhere
+              </p>
+            </div>
           </div>
 
-          <div className="mb-8">
-            <h2 className="text-4xl font-bold mb-4 leading-tight">
-              Welcome Back!
+          {/* Hero Text */}
+          <div className="max-w-xl">
+            <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm font-medium backdrop-blur-sm mb-5">
+              Welcome Back
+            </span>
+
+            <h2 className="text-4xl lg:text-5xl font-extrabold leading-tight mb-5">
+              Pick up where your
+              <br />
+              food journey left off
             </h2>
-            <p className="text-lg opacity-90">
-              Continue your culinary journey and discover amazing recipes and
-              restaurants tailored just for you.
+
+            <p className="text-base lg:text-lg text-white/85 leading-relaxed max-w-lg">
+              Continue exploring delicious recipes, trending restaurants, and
+              personalized recommendations crafted for your taste.
             </p>
           </div>
         </div>
 
-        {/* Stats Box */}
-        <div className="bg-white bg-opacity-20 backdrop-blur-sm rounded-xl p-6 border border-white border-opacity-30">
-          <div className="flex items-center gap-3 mb-3">
-            <span className="text-3xl">👨‍🍳</span>
-            <div>
-              <div className="text-3xl font-bold">50,000+</div>
-              <div className="text-lg opacity-90">Recipes</div>
+        {/* Bottom Section */}
+        <div className="relative z-10 space-y-6">
+          
+          {/* <div className="max-w-md rounded-2xl border border-white/20 bg-white/10 backdrop-blur-xl p-6 shadow-2xl">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center text-2xl shadow-inner">
+                👨‍🍳
+              </div>
+
+              <div>
+                <h3 className="text-3xl font-extrabold leading-none">
+                  50,000+
+                </h3>
+                <p className="text-white/85 mt-1 text-sm uppercase tracking-wide">
+                  Curated Recipes
+                </p>
+
+                <div className="mt-4 h-px w-full bg-white/20"></div>
+
+                <p className="mt-4 text-base text-white/90">
+                  Plus <span className="font-bold">10,000+</span> restaurant
+                  recommendations from around the world.
+                </p>
+              </div>
             </div>
+          </div> */}
+
+          {/* Sign Up CTA */}
+          <div className="max-w-md rounded-2xl border border-white/15 bg-white/5 backdrop-blur-md px-6 py-5">
+            <p className="text-white/85 text-sm mb-3 text-center">
+              Don&apos;t have an account yet?
+            </p>
+            <Link
+              to="/register"
+              className="inline-flex items-center justify-center w-full rounded-xl bg-white text-orange-600 font-semibold py-3.5 px-5 shadow-md hover:bg-orange-50 hover:text-orange-700 transition-all duration-300"
+            >
+              Create an account
+            </Link>
           </div>
-          <div className="text-lg opacity-90 mt-2">& 10,000+ Restaurants</div>
         </div>
       </div>
 
       {/* Right Content */}
       <div className="w-full md:w-1/2 bg-gray-50 flex flex-col p-6 sm:p-8 lg:p-12">
-        {/* Back Link */}
         <Link
           to="/"
           className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-12 w-fit"
@@ -171,9 +223,7 @@ const Login = () => {
           Back to Home
         </Link>
 
-        {/* Form Container */}
         <div className="flex-1 flex flex-col justify-center max-w-sm mx-auto w-full">
-          {/* Header */}
           <div className="mb-8">
             <h2 className="text-3xl font-bold text-gray-900 mb-2">Login</h2>
             <p className="text-gray-600">
@@ -181,10 +231,8 @@ const Login = () => {
             </p>
           </div>
 
-          {/* Error Alert */}
           {error && <Alert message={error} type="error" onClose={() => {}} />}
 
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email Field */}
             <div>
@@ -215,9 +263,7 @@ const Login = () => {
                   value={formData.email}
                   onChange={handleChange}
                   placeholder="example@gmail.com"
-                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition ${
-                    formErrors.email ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition ${formErrors.email ? "border-red-500" : "border-gray-300"}`}
                 />
               </div>
               {formErrors.email && (
@@ -254,40 +300,17 @@ const Login = () => {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="••••••••"
-                  className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition ${
-                    formErrors.password ? "border-red-500" : "border-gray-300"
-                  }`}
+                  className={`w-full pl-10 pr-10 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition ${formErrors.password ? "border-red-500" : "border-gray-300"}`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-orange-600 focus:outline-none"
                 >
                   {showPassword ? (
-                    <svg
-                      className="w-5 h-5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                      <path
-                        fillRule="evenodd"
-                        d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
+                    <Eye className="w-5 h-5" />
                   ) : (
-                    <svg
-                      className="w-5 h-5"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M3.707 2.293a1 1 0 00-1.414 1.414l14 14a1 1 0 001.414-1.414l-14-14zM10 5a5 5 0 015 5 1 1 0 112 0 7 7 0 10-7 7 1 1 0 110-2 5 5 0 000-10z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
+                    <EyeOff className="w-5 h-5" />
                   )}
                 </button>
               </div>
@@ -300,64 +323,45 @@ const Login = () => {
 
             {/* Remember Me & Forgot Password */}
             <div className="flex items-center justify-between">
-              <label className="flex items-center cursor-pointer">
+              <label className="flex items-center cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 text-orange-600 rounded focus:ring-2 focus:ring-orange-500"
+                  className="w-4 h-4 text-orange-600 rounded focus:ring-2 focus:ring-orange-500 cursor-pointer"
                 />
-                <span className="ml-2 text-sm text-gray-700">Remember me</span>
+                <span className="ml-2 text-sm text-gray-700 group-hover:text-gray-900 transition-colors">
+                  Remember me
+                </span>
               </label>
               <Link
                 to="/forgot-password"
-                className="text-sm text-orange-600 hover:text-orange-700 font-medium"
+                name="password"
+                className="text-sm text-orange-600 hover:text-orange-700 font-medium transition-colors"
               >
                 Forgot password?
               </Link>
             </div>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-orange-600 text-white py-2 rounded-lg font-medium hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              {loading ? "Signing in..." : "Login"}
-            </button>
-          </form>
+            {/* Submit Button with Hover Note */}
+            <div className="relative group">
+              {/* Tooltip Note */}
+              {!isFormFilled && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-full max-w-[200px] bg-gray-800 text-white text-xs py-2 px-3 rounded-lg shadow-xl text-center z-20">
+                  Please enter your email and password to login.
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-gray-800"></div>
+                </div>
+              )}
 
-          {/* Sign Up Link */}
-          <p className="text-center text-gray-600 mt-6">
-            Don't have an account?{" "}
-            <Link
-              to="/register"
-              className="text-orange-600 hover:text-orange-700 font-medium"
-            >
-              Sign up
-            </Link>
-          </p>
-
-          {/* Social Login (Optional) */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <p className="text-center text-gray-600 text-sm mb-4">
-              Or continue with
-            </p>
-            <div className="flex gap-4">
               <button
-                type="button"
-                className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition"
+                type="submit"
+                disabled={loading || !isFormFilled}
+                className="w-full bg-orange-600 text-white py-2.5 rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
-                Google
-              </button>
-              <button
-                type="button"
-                className="flex-1 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition"
-              >
-                Facebook
+                {loading ? "Signing in..." : "Login"}
               </button>
             </div>
-          </div>
+          </form>
         </div>
       </div>
     </div>

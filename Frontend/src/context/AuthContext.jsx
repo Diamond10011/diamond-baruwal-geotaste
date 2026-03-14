@@ -373,31 +373,88 @@ const AuthProvider = ({ children }) => {
   // FAVORITES MANAGEMENT
   // ============================================================================
 
-  const addRecipeToFavorites = useCallback((recipe) => {
-    setFavorites((prev) => {
-      const isAlreadyFav = prev.recipes.some((r) => r.id === recipe.id);
-      if (isAlreadyFav) {
-        return prev;
-      }
-      const newFavorites = [...prev.recipes, recipe];
-      localStorage.setItem("favoriteRecipes", JSON.stringify(newFavorites));
-      return {
+  const loadUserFavorites = useCallback(async () => {
+    if (!isAuthenticated || !tokens?.access) return;
+    try {
+      const response = await axios.get(`${API_BASE_URL}/my-favorites/`, {
+        headers: { Authorization: `Bearer ${tokens.access}` },
+      });
+      const recipeList = (response.data.favorites || []).map(
+        (fav) => fav.recipe_details,
+      );
+      setFavorites((prev) => ({
         ...prev,
-        recipes: newFavorites,
-      };
-    });
-  }, []);
+        recipes: recipeList,
+      }));
+    } catch (err) {
+      console.error("Failed to load favorites:", err);
+    }
+  }, [isAuthenticated, tokens]);
 
-  const removeRecipeFromFavorites = useCallback((recipeId) => {
-    setFavorites((prev) => {
-      const updated = prev.recipes.filter((r) => r.id !== recipeId);
-      localStorage.setItem("favoriteRecipes", JSON.stringify(updated));
-      return {
-        ...prev,
-        recipes: updated,
-      };
-    });
-  }, []);
+  useEffect(() => {
+    loadUserFavorites();
+  }, [isAuthenticated, tokens, loadUserFavorites]);
+
+  const addRecipeToFavorites = useCallback(
+    async (recipe) => {
+      if (!tokens?.access) {
+        setError("Not authenticated");
+        return;
+      }
+
+      try {
+        await axios.post(
+          `${API_BASE_URL}/my-favorites/`,
+          { recipe_id: recipe.id },
+          {
+            headers: { Authorization: `Bearer ${tokens.access}` },
+          },
+        );
+
+        setFavorites((prev) => {
+          const isAlreadyFav = prev.recipes.some((r) => r.id === recipe.id);
+          if (isAlreadyFav) {
+            return prev;
+          }
+          return {
+            ...prev,
+            recipes: [...prev.recipes, recipe],
+          };
+        });
+      } catch (err) {
+        console.error("Failed to add to favorites:", err);
+        setError("Failed to add recipe to favorites");
+      }
+    },
+    [tokens],
+  );
+
+  const removeRecipeFromFavorites = useCallback(
+    async (recipeId) => {
+      if (!tokens?.access) {
+        setError("Not authenticated");
+        return;
+      }
+
+      try {
+        await axios.delete(`${API_BASE_URL}/my-favorites/${recipeId}/`, {
+          headers: { Authorization: `Bearer ${tokens.access}` },
+        });
+
+        setFavorites((prev) => {
+          const updated = prev.recipes.filter((r) => r.id !== recipeId);
+          return {
+            ...prev,
+            recipes: updated,
+          };
+        });
+      } catch (err) {
+        console.error("Failed to remove from favorites:", err);
+        setError("Failed to remove recipe from favorites");
+      }
+    },
+    [tokens],
+  );
 
   const addRestaurantToFavorites = useCallback((restaurant) => {
     setFavorites((prev) => {

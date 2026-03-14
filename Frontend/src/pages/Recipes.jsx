@@ -688,7 +688,7 @@ const Recipes = () => {
                       View Details
                     </button>
 
-                    {user?.id === recipe.author && (
+                    {user?.email === recipe.author_email && (
                       <>
                         <button
                           onClick={() => setEditingId(recipe.id)}

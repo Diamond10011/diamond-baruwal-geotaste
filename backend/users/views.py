@@ -6,7 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .models import (
     CustomUser, UserProfile, StoreUserProfile, RestaurantUserProfile, OTP,
-    Recipe, RecipeRating, RecipeLike, RestaurantLocation, RestaurantMenu, RestaurantRating,
+    Recipe, RecipeRating, RecipeLike, FavoriteRecipe, RestaurantLocation, RestaurantMenu, RestaurantRating,
     StoreProduct, Order, OrderItem, Payment
 )
 from .serializers import (
@@ -15,17 +15,25 @@ from .serializers import (
     ForgotPasswordSerializer, VerifyPasswordResetOTPSerializer, ResetPasswordSerializer,
     EmailVerificationSerializer, send_verification_email, send_password_reset_email,
     RecipeListSerializer, RecipeDetailSerializer, RecipeCreateUpdateSerializer,
-    RecipeRatingSerializer, RecipeLikeSerializer,
+    RecipeRatingSerializer, RecipeLikeSerializer, FavoriteRecipeSerializer,
     RestaurantListSerializer, RestaurantDetailSerializer, RestaurantMenuSerializer,
     RestaurantRatingSerializer, NearbyRestaurantSerializer,
     StoreProductSerializer, OrderSerializer, OrderItemSerializer, PaymentSerializer
 )
 from django.utils import timezone
+import uuid
 
 
 # ============================================================================
 # AUTHENTICATION ENDPOINTS
 # ============================================================================
+
+def _parse_uuid(value):
+    """Parse UUIDs coming from URL/query/body; return None when invalid."""
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, TypeError, AttributeError):
+        return None
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -440,8 +448,12 @@ def recipe_detail(request, recipe_id):
     PUT: Update recipe (author only)
     DELETE: Delete recipe (author only)
     """
+    recipe_uuid = _parse_uuid(recipe_id)
+    if not recipe_uuid:
+        return Response({'error': 'Recipe not found'}, status=status.HTTP_404_NOT_FOUND)
+
     try:
-        recipe = Recipe.objects.get(id=recipe_id)
+        recipe = Recipe.objects.get(id=recipe_uuid)
     except Recipe.DoesNotExist:
         return Response({'error': 'Recipe not found'}, status=status.HTTP_404_NOT_FOUND)
     
@@ -474,8 +486,12 @@ def recipe_detail(request, recipe_id):
 @permission_classes([IsAuthenticated])
 def recipe_like(request, recipe_id):
     """Toggle like on a recipe"""
+    recipe_uuid = _parse_uuid(recipe_id)
+    if not recipe_uuid:
+        return Response({'error': 'Recipe not found'}, status=status.HTTP_404_NOT_FOUND)
+
     try:
-        recipe = Recipe.objects.get(id=recipe_id)
+        recipe = Recipe.objects.get(id=recipe_uuid)
     except Recipe.DoesNotExist:
         return Response({'error': 'Recipe not found'}, status=status.HTTP_404_NOT_FOUND)
     
@@ -497,8 +513,12 @@ def recipe_rating(request, recipe_id):
     POST: Create or update rating
     DELETE: Delete rating
     """
+    recipe_uuid = _parse_uuid(recipe_id)
+    if not recipe_uuid:
+        return Response({'error': 'Recipe not found'}, status=status.HTTP_404_NOT_FOUND)
+
     try:
-        recipe = Recipe.objects.get(id=recipe_id)
+        recipe = Recipe.objects.get(id=recipe_uuid)
     except Recipe.DoesNotExist:
         return Response({'error': 'Recipe not found'}, status=status.HTTP_404_NOT_FOUND)
     
@@ -545,6 +565,65 @@ def user_recipes(request):
         'count': recipes.count(),
         'recipes': serializer.data
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def user_favorite_recipes(request):
+    """
+    GET: Get user's favorite recipes
+    POST: Add recipe to favorites
+    """
+    if request.method == 'POST':
+        recipe_id = request.data.get('recipe_id')
+        recipe_uuid = _parse_uuid(recipe_id)
+        if not recipe_uuid:
+            return Response({'error': 'Recipe not found'}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            recipe = Recipe.objects.get(id=recipe_uuid)
+        except Recipe.DoesNotExist:
+            return Response({'error': 'Recipe not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Check if already favorited
+        favorite, created = FavoriteRecipe.objects.get_or_create(
+            recipe=recipe,
+            user=request.user
+        )
+        
+        if created:
+            return Response({
+                'message': 'Recipe added to favorites',
+                'favorite': FavoriteRecipeSerializer(favorite).data
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response({
+                'message': 'Recipe is already in favorites',
+                'favorite': FavoriteRecipeSerializer(favorite).data
+            }, status=status.HTTP_200_OK)
+    
+    # GET - List user's favorite recipes
+    favorites = FavoriteRecipe.objects.filter(user=request.user).select_related('recipe')
+    serializer = FavoriteRecipeSerializer(favorites, many=True)
+    return Response({
+        'count': favorites.count(),
+        'favorites': serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_favorite_recipe(request, recipe_id):
+    """Remove recipe from user's favorites"""
+    try:
+        recipe_uuid = _parse_uuid(recipe_id)
+        if not recipe_uuid:
+            return Response({'error': 'Recipe not in favorites'}, status=status.HTTP_404_NOT_FOUND)
+
+        favorite = FavoriteRecipe.objects.get(recipe_id=recipe_uuid, user=request.user)
+        favorite.delete()
+        return Response({'message': 'Recipe removed from favorites'}, status=status.HTTP_200_OK)
+    except FavoriteRecipe.DoesNotExist:
+        return Response({'error': 'Recipe not in favorites'}, status=status.HTTP_404_NOT_FOUND)
 
 
 # ============================================================================

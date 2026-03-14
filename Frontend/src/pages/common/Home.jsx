@@ -65,11 +65,9 @@ const Home = () => {
       return;
     }
     // Redirect based on user role
-    if (user?.role === "normal" || user?.role === "customer") {
-      navigate("/stores");
-    } else if (user?.role === "chef" || user?.role === "restaurant" || user?.role === "admin") {
+    
       navigate("/restaurants");
-    }
+    
   };
 
   const quickFilters = [
@@ -77,7 +75,6 @@ const Home = () => {
     { label: "Vegetarian", icon: "🥗" },
     { label: "Fast Food", icon: "⚡" },
     { label: "Fine Dining", icon: "✨" },
-    { label: "Delivery", icon: "🚚" },
   ];
 
   return (
@@ -131,12 +128,12 @@ const Home = () => {
 
             <div className="flex flex-wrap gap-3 justify-center">
               {quickFilters.map((f) => (
-                <button
+                <div
                   key={f.label}
-                  className="px-5 py-2 text-sm rounded-full bg-black/30 hover:bg-orange-600 text-white border border-white/10 backdrop-blur-md transition-all font-semibold"
+                  className="px-5 py-2 text-sm rounded-full bg-black/30  text-white border border-white/10 backdrop-blur-md transition-all font-semibold"
                 >
                   {f.icon} {f.label}
-                </button>
+                </ div>
               ))}
             </div>
           </div>

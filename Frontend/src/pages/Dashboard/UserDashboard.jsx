@@ -74,7 +74,6 @@ const UserDashboard = () => {
     { label: "Vegetarian", icon: "🥗" },
     { label: "Fast Food", icon: "⚡" },
     { label: "Fine Dining", icon: "✨" },
-    { label: "Delivery", icon: "🚚" },
   ];
 
   const cuisineTypes = [

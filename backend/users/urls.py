@@ -7,6 +7,7 @@ from .views import (
     change_password, admin_dashboard, user_dashboard,
     # Recipe endpoints
     recipe_list, recipe_detail, recipe_like, recipe_rating, user_recipes,
+    user_favorite_recipes, remove_favorite_recipe,
     # Restaurant endpoints
     restaurant_list, restaurant_detail, restaurant_nearby, restaurant_menu, restaurant_rating,
     # Store product endpoints
@@ -52,6 +53,8 @@ urlpatterns = [
     path('recipes/<str:recipe_id>/like/', recipe_like, name='recipe_like'),
     path('recipes/<str:recipe_id>/rating/', recipe_rating, name='recipe_rating'),
     path('my-recipes/', user_recipes, name='user_recipes'),
+    path('my-favorites/', user_favorite_recipes, name='user_favorite_recipes'),
+    path('my-favorites/<str:recipe_id>/', remove_favorite_recipe, name='remove_favorite_recipe'),
     
     # ==================== RESTAURANTS ====================
     path('restaurants/', restaurant_list, name='restaurant_list'),

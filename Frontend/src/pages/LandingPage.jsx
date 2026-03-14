@@ -75,7 +75,7 @@ export default function LandingPage() {
             </div>
             <div>
               <button className="text-gray-700 hover:text-orange-600 px-4 py-2 rounded-full transition-colors">
-               <Link to="/register">Sign In</Link>
+               <Link to="/register">Sign Up</Link>
               </button>
 
               <button className="bg-orange-600 text-white px-6 py-2 rounded-full hover:bg-orange-700 transition-all transform hover:scale-105">
@@ -230,9 +230,8 @@ export default function LandingPage() {
                 <img src={logo} alt="Logo" className="rounded-2xl h-16" />
                 <span className="text-xl font-bold text-white">GeoTaste</span>
               </div>
-              <p className="text-sm">
-                Discover your next culinary adventure with AI-powered
-                recommendations.
+              <p className="text-sm text-center">
+                Discover your next culinary adventure with  personalized food and restaurant recommendations.
               </p>
             </div>
             <div>
@@ -324,7 +323,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="border-t border-gray-800 pt-8 text-center text-sm">
-            <p>&copy; 2024 GeoTaste. All rights reserved.</p>
+            <p>&copy; 2025 GeoTaste. All rights reserved.</p>
           </div>
         </div>
       </footer>

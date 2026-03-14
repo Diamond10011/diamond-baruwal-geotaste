@@ -206,6 +206,20 @@ class RecipeLike(models.Model):
         return f"{self.user.email} liked {self.recipe.title}"
 
 
+class FavoriteRecipe(models.Model):
+    """User favorite recipes"""
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='favorited_by')
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='favorite_recipes')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('recipe', 'user')
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.user.email} favorited {self.recipe.title}"
+
+
 # ============================================================================
 # RESTAURANT LOCATION MODELS
 # ============================================================================

@@ -24,6 +24,19 @@ const Recommendations = () => {
     limit: 10,
   });
 
+  // --- NEW: Effect to clear error message after 5 seconds ---
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => {
+        setError(null);
+      }, 5000);
+
+      // Cleanup the timer if the component unmounts or error changes
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+  // ---------------------------------------------------------
+
   useEffect(() => {
     fetchRecommendations();
   }, []);
@@ -229,13 +242,13 @@ const Recommendations = () => {
 
         {/* Error Alert */}
         {error && (
-          <div className="mb-8 p-4 bg-red-100 border-2 border-red-300 text-red-700 rounded-lg font-medium">
+          <div className="mb-8 p-4 bg-red-100 border-2 border-red-300 text-red-700 rounded-lg font-medium animate-pulse">
             {error}
           </div>
         )}
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-10 border-b-2 border-gray-200 overflow-x-auto">
+        <div className="flex gap-2 mb-10">
           {[
             { id: "personalized", label: "👤 For You", icon: "🎯" },
             { id: "popular", label: "🔥 Popular", icon: "⭐" },

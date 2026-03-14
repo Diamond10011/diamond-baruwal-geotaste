@@ -47,11 +47,7 @@ const Profile = () => {
         profile_photo: user.profile.profile_photo || "",
       });
       if (user.profile.profile_photo) {
-        // Convert relative path to absolute URL
-        const photoUrl = user.profile.profile_photo.startsWith("http")
-          ? user.profile.profile_photo
-          : `http://localhost:8000${user.profile.profile_photo}`;
-        setPhotoPreview(photoUrl);
+        setPhotoPreview(user.profile.profile_photo);
       }
     }
   }, [
@@ -167,39 +163,56 @@ const Profile = () => {
 
     try {
       setLocalError(null);
-      const response = await updateProfile(profileData, photoFile);
+
+      // Prepare data - only send formData if there's a new photo file
+      let dataToSend;
+      let hasFile = false;
+
+      if (photoFile) {
+        // Has a new photo file - use FormData
+        hasFile = true;
+        dataToSend = new FormData();
+        dataToSend.append("first_name", profileData.first_name);
+        dataToSend.append("last_name", profileData.last_name);
+        dataToSend.append("phone_number", profileData.phone_number);
+        dataToSend.append("location", profileData.location);
+        dataToSend.append("bio", profileData.bio);
+        dataToSend.append("profile_photo", photoFile);
+      } else {
+        // No file - send as JSON (much simpler!)
+        dataToSend = {
+          first_name: profileData.first_name,
+          last_name: profileData.last_name,
+          phone_number: profileData.phone_number,
+          location: profileData.location,
+          bio: profileData.bio,
+        };
+      }
+
+      const response = await updateProfile(dataToSend, hasFile);
 
       // Update local state with the response data to ensure it persists
       if (response?.profile) {
-        const updatedProfile = {
+        setProfileData({
           first_name: response.profile.first_name || "",
           last_name: response.profile.last_name || "",
           phone_number: response.profile.phone_number || "",
           location: response.profile.location || "",
           bio: response.profile.bio || "",
           profile_photo: response.profile.profile_photo || "",
-        };
-        setProfileData(updatedProfile);
-
-        // Handle photo URL - convert relative path to absolute
+        });
         if (response.profile.profile_photo) {
-          const photoUrl = response.profile.profile_photo.startsWith("http")
-            ? response.profile.profile_photo
-            : `http://localhost:8000${response.profile.profile_photo}`;
-          setPhotoPreview(photoUrl);
+          setPhotoPreview(response.profile.profile_photo);
+          setPhotoFile(null); // Clear the file after successful upload
         }
       }
 
-      setPhotoFile(null);
       setSuccessMessage("✅ Profile updated successfully!");
       setEditMode(false);
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (err) {
       const errorMsg =
-        err.response?.data?.profile_photo?.[0] ||
-        err.response?.data?.detail ||
-        err.message ||
-        "Failed to update profile";
+        err.response?.data?.detail || err.message || "Failed to update profile";
       setLocalError(errorMsg);
       setSuccessMessage("");
     }

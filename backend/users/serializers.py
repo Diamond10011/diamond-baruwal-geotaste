@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from .models import (
     CustomUser, UserProfile, StoreUserProfile, RestaurantUserProfile, OTP, PasswordResetToken,
-    Recipe, RecipeRating, RecipeLike, RestaurantLocation, RestaurantMenu, RestaurantRating,
+    Recipe, RecipeRating, RecipeLike, FavoriteRecipe, RestaurantLocation, RestaurantMenu, RestaurantRating,
     StoreProduct, Order, OrderItem, Payment
 )
 from django.core.mail import send_mail
@@ -347,6 +347,38 @@ class RecipeLikeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'user_email', 'created_at']
 
 
+class FavoriteRecipeSerializer(serializers.ModelSerializer):
+    """Serializer for favorite recipes"""
+    recipe_details = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = FavoriteRecipe
+        fields = ['id', 'recipe_details', 'created_at']
+        read_only_fields = ['id', 'created_at']
+    
+    def get_recipe_details(self, obj):
+        """Return recipe details in the favorite"""
+        recipe = obj.recipe
+        author_name = f"{recipe.author.profile.first_name} {recipe.author.profile.last_name}".strip() or recipe.author.email
+        return {
+            'id': str(recipe.id),
+            'title': recipe.title,
+            'description': recipe.description,
+            'difficulty': recipe.difficulty,
+            'cuisine_type': recipe.cuisine_type,
+            'preparation_time': recipe.preparation_time,
+            'cooking_time': recipe.cooking_time,
+            'servings': recipe.servings,
+            'recipe_image': recipe.recipe_image,
+            'recipe_video': recipe.recipe_video,
+            'dietary_tags': recipe.dietary_tags,
+            'author_email': recipe.author.email,
+            'author_name': author_name,
+            'views_count': recipe.views_count,
+            'created_at': recipe.created_at,
+        }
+
+
 class RecipeListSerializer(serializers.ModelSerializer):
     """Serializer for recipe list view"""
     author_email = serializers.CharField(source='author.email', read_only=True)
@@ -366,7 +398,13 @@ class RecipeListSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'author_email', 'views_count', 'created_at']
     
     def get_author_name(self, obj):
-        return f"{obj.author.profile.first_name} {obj.author.profile.last_name}".strip() or obj.author.email
+        # Some users (e.g. created via createsuperuser) may not have a UserProfile row.
+        profile = getattr(obj.author, "profile", None)
+        if profile:
+            name = f"{profile.first_name} {profile.last_name}".strip()
+            if name:
+                return name
+        return obj.author.email
     
     def get_rating_count(self, obj):
         return obj.ratings.count()
@@ -404,7 +442,13 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'views_count', 'created_at', 'updated_at']
     
     def get_author_name(self, obj):
-        return f"{obj.author.profile.first_name} {obj.author.profile.last_name}".strip() or obj.author.email
+        # Some users (e.g. created via createsuperuser) may not have a UserProfile row.
+        profile = getattr(obj.author, "profile", None)
+        if profile:
+            name = f"{profile.first_name} {profile.last_name}".strip()
+            if name:
+                return name
+        return obj.author.email
     
     def get_likes_count(self, obj):
         return obj.likes.count()
