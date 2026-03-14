@@ -426,6 +426,7 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
     ratings = RecipeRatingSerializer(many=True, read_only=True)
     likes_count = serializers.SerializerMethodField()
+    rating_count = serializers.SerializerMethodField()
     user_liked = serializers.SerializerMethodField()
     user_rating = serializers.SerializerMethodField()
     avg_rating = serializers.SerializerMethodField()
@@ -452,6 +453,9 @@ class RecipeDetailSerializer(serializers.ModelSerializer):
     
     def get_likes_count(self, obj):
         return obj.likes.count()
+
+    def get_rating_count(self, obj):
+        return obj.ratings.count()
     
     def get_user_liked(self, obj):
         request = self.context.get('request')
