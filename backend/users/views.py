@@ -17,7 +17,7 @@ from .serializers import (
     RecipeListSerializer, RecipeDetailSerializer, RecipeCreateUpdateSerializer,
     RecipeRatingSerializer, RecipeLikeSerializer, FavoriteRecipeSerializer,
     RestaurantListSerializer, RestaurantDetailSerializer, RestaurantMenuSerializer,
-    RestaurantRatingSerializer, NearbyRestaurantSerializer,
+    RestaurantLocationSerializer, RestaurantRatingSerializer, NearbyRestaurantSerializer,
     StoreProductSerializer, OrderSerializer, OrderItemSerializer, PaymentSerializer
 )
 from django.utils import timezone
@@ -634,7 +634,7 @@ def remove_favorite_recipe(request, recipe_id):
 @permission_classes([AllowAny])
 def restaurant_list(request):
     """Get all restaurants with locations"""
-    restaurants = RestaurantUserProfile.objects.filter(is_verified=True).prefetch_related('location')
+    restaurants = RestaurantUserProfile.objects.all().prefetch_related('location')
     serializer = RestaurantListSerializer(restaurants, many=True)
     return Response({
         'count': restaurants.count(),
@@ -780,6 +780,59 @@ def restaurant_rating(request, restaurant_id):
             rating.delete()
             return Response({'message': 'Rating deleted'}, status=status.HTTP_200_OK)
         return Response({'error': 'No rating found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET', 'POST', 'PUT'])
+@permission_classes([IsAuthenticated])
+def restaurant_location(request):
+    """
+    GET: Get restaurant location for current user
+    POST: Create restaurant location for current user
+    PUT: Update restaurant location for current user
+    """
+    user = request.user
+    
+    if user.role != 'restaurant':
+        return Response({
+            'error': 'Only restaurant users can access this endpoint'
+        }, status=status.HTTP_403_FORBIDDEN)
+    
+    # Get or create restaurant profile
+    try:
+        restaurant_profile = RestaurantUserProfile.objects.get(user=user)
+    except RestaurantUserProfile.DoesNotExist:
+        return Response({
+            'error': 'Restaurant profile not found. Please create a restaurant profile first.'
+        }, status=status.HTTP_404_NOT_FOUND)
+    
+    location, created = RestaurantLocation.objects.get_or_create(
+        restaurant=restaurant_profile,
+        defaults={
+            'latitude': None,
+            'longitude': None,
+            'city': '',
+            'country': '',
+            'phone_number': '',
+        }
+    )
+    
+    if request.method == 'GET':
+        serializer = RestaurantLocationSerializer(location)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST' or request.method == 'PUT':
+        serializer = RestaurantLocationSerializer(location, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'message': 'Restaurant location updated successfully',
+                'location': serializer.data
+            }, status=status.HTTP_200_OK)
+        # Return detailed error messages
+        return Response({
+            'error': 'Validation failed',
+            'details': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ============================================================================
@@ -1071,6 +1124,105 @@ def payment_detail(request, payment_id):
 # RECOMMENDATION ENGINE ENDPOINTS
 # ============================================================================
 
+import re
+
+def _tokenize_list_field(value):
+    """
+    Normalize free-form ingredients/tags fields into a token set.
+    Supports newline/comma separated text; ignores empty tokens.
+    """
+    if not value:
+        return set()
+    # Split on commas/newlines/semicolons, then keep simple word-like tokens.
+    parts = re.split(r"[\n,;]+", str(value))
+    tokens = set()
+    for part in parts:
+        token = part.strip().lower()
+        if not token:
+            continue
+        tokens.add(token)
+    return tokens
+
+def _get_user_recipe_prefs(user):
+    """
+    Build preference signals from existing interactions:
+    - likes (RecipeLike)
+    - favorites (FavoriteRecipe)
+    - ratings (RecipeRating)
+    """
+    from django.db.models import Q
+
+    favorite_ids = FavoriteRecipe.objects.filter(user=user).values_list("recipe_id", flat=True)
+    liked_ids = RecipeLike.objects.filter(user=user).values_list("recipe_id", flat=True)
+    rated_ids = RecipeRating.objects.filter(user=user).values_list("recipe_id", flat=True)
+
+    interacted_ids = set(favorite_ids) | set(liked_ids) | set(rated_ids)
+    if not interacted_ids:
+        return {
+            "interacted_ids": set(),
+            "cuisines": set(),
+            "difficulties": set(),
+            "dietary_tags": set(),
+            "ingredients": set(),
+        }
+
+    interacted_recipes = Recipe.objects.filter(id__in=interacted_ids).only(
+        "cuisine_type",
+        "difficulty",
+        "dietary_tags",
+        "ingredients",
+    )
+
+    cuisines = set()
+    difficulties = set()
+    dietary_tags = set()
+    ingredients = set()
+
+    for recipe in interacted_recipes:
+        if recipe.cuisine_type:
+            cuisines.add(recipe.cuisine_type.strip().lower())
+        if recipe.difficulty:
+            difficulties.add(recipe.difficulty.strip().lower())
+        dietary_tags |= _tokenize_list_field(recipe.dietary_tags)
+        ingredients |= _tokenize_list_field(recipe.ingredients)
+
+    return {
+        "interacted_ids": interacted_ids,
+        "cuisines": cuisines,
+        "difficulties": difficulties,
+        "dietary_tags": dietary_tags,
+        "ingredients": ingredients,
+    }
+
+def _score_recipe_for_user(recipe, prefs):
+    """
+    Lightweight scoring function combining similarity + popularity.
+    """
+    score = 0.0
+
+    cuisine = (recipe.cuisine_type or "").strip().lower()
+    if cuisine and cuisine in prefs["cuisines"]:
+        score += 7.0
+
+    difficulty = (recipe.difficulty or "").strip().lower()
+    if difficulty and difficulty in prefs["difficulties"]:
+        score += 2.0
+
+    tag_overlap = len(_tokenize_list_field(recipe.dietary_tags) & prefs["dietary_tags"])
+    score += min(tag_overlap, 5) * 1.5
+
+    ingredient_overlap = len(_tokenize_list_field(recipe.ingredients) & prefs["ingredients"])
+    score += min(ingredient_overlap, 8) * 1.0
+
+    # Popularity / quality
+    likes_count = getattr(recipe, "likes_count", 0) or 0
+    ratings_count = getattr(recipe, "ratings_count", 0) or 0
+    avg_rating = getattr(recipe, "avg_rating", 0) or 0
+    views = getattr(recipe, "views_count", 0) or 0
+
+    score += (likes_count * 0.5) + (ratings_count * 0.25) + (float(avg_rating) * 1.5) + (views * 0.01)
+    return score
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def recommend_recipes(request):
@@ -1092,70 +1244,44 @@ def recommend_recipes(request):
     limit = int(request.query_params.get('limit', 10))
     cuisine_filter = request.query_params.get('cuisine_type', '').strip()
     difficulty_filter = request.query_params.get('difficulty', '').strip()
-    
-    # Get user's favorite recipes
-    user_favorite_recipes = Recipe.objects.filter(
-        likes__user=user
-    ).values_list('id', flat=True)
-    
-    # Get user's rated recipes
-    user_rated_recipes = Recipe.objects.filter(
-        ratings__user=user
-    ).values_list('id', flat=True)
-    
-    # Combine user's interacted recipes
-    user_interacted = set(user_favorite_recipes) | set(user_rated_recipes)
-    
-    # Base queryset excluding user's own recipes and already interacted recipes
-    base_recipes = Recipe.objects.exclude(
-        Q(author=user) | Q(id__in=user_interacted)
-    )
-    
-    # Apply filters if provided
+
+    prefs = _get_user_recipe_prefs(user)
+
+    # Prefer "new to you" recipes, but fall back if dataset is small.
+    base_qs_new = Recipe.objects.exclude(Q(author=user) | Q(id__in=prefs["interacted_ids"]))
+    base_qs_warm = Recipe.objects.exclude(Q(author=user))
+
     if cuisine_filter:
-        base_recipes = base_recipes.filter(cuisine_type__icontains=cuisine_filter)
-    
+        base_qs_new = base_qs_new.filter(cuisine_type__icontains=cuisine_filter)
+        base_qs_warm = base_qs_warm.filter(cuisine_type__icontains=cuisine_filter)
     if difficulty_filter:
-        base_recipes = base_recipes.filter(difficulty=difficulty_filter)
-    
-    # Calculate recommendation score: views + likes + average rating
-    recommendations = base_recipes.annotate(
-        likes_count=Count('likes'),
-        avg_rating=Avg('ratings__rating'),
-        engagement_score=Count('likes') + (Count('ratings') * 2) + (F('views_count') * 0.1)
-    ).order_by('-engagement_score', '-avg_rating', '-views_count')[:limit]
-    
-    # Get similar recipes based on user's favorites
-    if user_favorite_recipes.exists():
-        favorite_recipes = Recipe.objects.filter(id__in=user_favorite_recipes)
-        # Get cuisine types and difficulty levels the user likes
-        favorite_cuisines = set(
-            favorite_recipes.values_list('cuisine_type', flat=True)
-        )
-        favorite_difficulties = set(
-            favorite_recipes.values_list('difficulty', flat=True)
-        )
-        
-        # Find similar recipes
-        similar_recipes = base_recipes.filter(
-            Q(cuisine_type__in=favorite_cuisines) |
-            Q(difficulty__in=favorite_difficulties)
-        ).annotate(
-            likes_count=Count('likes'),
-            avg_rating=Avg('ratings__rating'),
-            engagement_score=Count('likes') + (Count('ratings') * 2) + (F('views_count') * 0.1)
-        ).order_by('-engagement_score', '-avg_rating')[:limit]
-        
-        # Combine and deduplicate
-        all_recommendations = list(similar_recipes) + list(recommendations)
-        seen_ids = set()
-        unique_recommendations = []
-        for recipe in all_recommendations:
-            if recipe.id not in seen_ids:
-                unique_recommendations.append(recipe)
-                seen_ids.add(recipe.id)
-        
-        recommendations = unique_recommendations[:limit]
+        base_qs_new = base_qs_new.filter(difficulty=difficulty_filter)
+        base_qs_warm = base_qs_warm.filter(difficulty=difficulty_filter)
+
+    # Pull candidates, then score with similarity signals.
+    # Start with new recipes; if too few, include already-interacted recipes (still excluding own).
+    qs = base_qs_new
+    if qs.count() < max(1, min(limit, 10)):
+        qs = base_qs_warm
+    # Final fallback: if user only has their own recipes, still recommend something.
+    if qs.count() == 0:
+        qs = Recipe.objects.all()
+
+    candidates = list(
+        qs.annotate(
+            likes_count=Count("likes"),
+            ratings_count=Count("ratings"),
+            avg_rating=Avg("ratings__rating"),
+        ).order_by("-views_count")[:300]
+    )
+
+    # If user has no interactions yet, fall back to popular-ish ordering.
+    if not prefs["interacted_ids"]:
+        recommendations = candidates[:limit]
+    else:
+        scored = [(r, _score_recipe_for_user(r, prefs)) for r in candidates]
+        scored.sort(key=lambda x: x[1], reverse=True)
+        recommendations = [r for (r, _s) in scored[:limit]]
     
     serializer = RecipeListSerializer(recommendations, many=True, context={'request': request})
     return Response({
@@ -1233,7 +1359,6 @@ def recommend_restaurants(request):
     - cuisine_type: filter by cuisine
     """
     from django.db.models import Q, Count, Avg
-    from decimal import Decimal
     import math
     
     user = request.user
@@ -1242,72 +1367,81 @@ def recommend_restaurants(request):
     longitude = request.query_params.get('longitude')
     radius = float(request.query_params.get('radius', 20))
     cuisine_filter = request.query_params.get('cuisine_type', '').strip()
-    
-    # Get user's favorite restaurants
-    user_favorite_restaurants = RestaurantUserProfile.objects.filter(
-        # Assuming there's a favorite mechanism, adjust as needed
-    ).values_list('id', flat=True)
-    
-    # Base queryset
-    base_restaurants = RestaurantUserProfile.objects.filter(
-        is_verified=True
-    ).exclude(id__in=user_favorite_restaurants)
-    
-    # Apply cuisine filter if provided
+
+    prefs = _get_user_recipe_prefs(user)
+
+    verified_qs = RestaurantUserProfile.objects.filter(is_verified=True)
+    base_profiles = verified_qs if verified_qs.exists() else RestaurantUserProfile.objects.all()
+    base_qs = base_profiles.prefetch_related("location")
     if cuisine_filter:
-        base_restaurants = base_restaurants.filter(cuisine_type__icontains=cuisine_filter)
-    
-    # Get restaurants with location data
-    restaurants_with_location = base_restaurants.prefetch_related('location').exclude(
-        location__isnull=True
+        base_qs = base_qs.filter(cuisine_type__icontains=cuisine_filter)
+
+    # Annotate rating signals once (avoid N+1).
+    base_qs = base_qs.annotate(
+        avg_rating=Avg("ratings__rating"),
+        ratings_count=Count("ratings"),
     )
-    
-    # If user location provided, filter by distance
+
+    user_lat = user_lon = None
     if latitude and longitude:
         try:
             user_lat = float(latitude)
             user_lon = float(longitude)
-            
-            nearby_restaurants = []
-            for restaurant in restaurants_with_location:
-                if not restaurant.location:
-                    continue
-                
-                rest_lat = float(restaurant.location.latitude)
-                rest_lon = float(restaurant.location.longitude)
-                
-                # Haversine formula for distance
-                R = 6371  # Earth's radius in km
-                dlat = math.radians(rest_lat - user_lat)
-                dlon = math.radians(rest_lon - user_lon)
-                a = math.sin(dlat/2)**2 + math.cos(math.radians(user_lat)) * math.cos(math.radians(rest_lat)) * math.sin(dlon/2)**2
-                c = 2 * math.asin(math.sqrt(a))
-                distance = R * c
-                
-                if distance <= radius:
-                    nearby_restaurants.append(restaurant)
-            
-            restaurants_with_location = nearby_restaurants
         except (ValueError, TypeError):
-            pass  # Ignore invalid coordinates
-    
-    # Calculate recommendation score
-    recommendations = []
-    for restaurant in restaurants_with_location:
-        rating_count = restaurant.ratings.count()
-        avg_rating = restaurant.rating_avg or 0
-        
-        # Score: average rating (weighted heavily) + number of ratings
-        score = (avg_rating * 10) + rating_count
-        
-        recommendations.append({
-            'restaurant': restaurant,
-            'score': score
-        })
-    
-    # Sort by score
-    recommendations_sorted = sorted(recommendations, key=lambda x: x['score'], reverse=True)[:limit]
-    restaurant_list = [r['restaurant'] for r in recommendations_sorted]
+            user_lat = user_lon = None
+
+    candidates = []
+    for restaurant in base_qs[:300]:
+        loc = getattr(restaurant, "location", None)
+        has_coords = bool(loc and loc.latitude is not None and loc.longitude is not None)
+
+        distance_km = None
+        if user_lat is not None and user_lon is not None:
+            # "Near you" mode: only include restaurants that have coordinates.
+            if not has_coords:
+                continue
+
+            rest_lat = float(loc.latitude)
+            rest_lon = float(loc.longitude)
+            R = 6371
+            dlat = math.radians(rest_lat - user_lat)
+            dlon = math.radians(rest_lon - user_lon)
+            a = (
+                math.sin(dlat / 2) ** 2
+                + math.cos(math.radians(user_lat))
+                * math.cos(math.radians(rest_lat))
+                * math.sin(dlon / 2) ** 2
+            )
+            c = 2 * math.asin(math.sqrt(a))
+            distance_km = R * c
+            if distance_km > radius:
+                continue
+
+        cuisine = (restaurant.cuisine_type or "").strip().lower()
+        cuisine_bonus = 5.0 if cuisine and any(pref in cuisine for pref in prefs["cuisines"]) else 0.0
+
+        avg_rating = float(getattr(restaurant, "avg_rating", 0) or 0)
+        ratings_count = int(getattr(restaurant, "ratings_count", 0) or 0)
+
+        proximity_bonus = 0.0
+        if distance_km is not None and radius > 0:
+            proximity_bonus = max(0.0, (radius - distance_km) / radius) * 5.0
+
+        score = cuisine_bonus + (avg_rating * 10.0) + (ratings_count * 0.25) + proximity_bonus
+        candidates.append((restaurant, score))
+
+    # If user shared location but we have zero restaurants with coords, fall back to non-location ranking.
+    if user_lat is not None and user_lon is not None and not candidates:
+        for restaurant in base_qs[:300]:
+            cuisine = (restaurant.cuisine_type or "").strip().lower()
+            cuisine_bonus = 5.0 if cuisine and any(pref in cuisine for pref in prefs["cuisines"]) else 0.0
+            avg_rating = float(getattr(restaurant, "avg_rating", 0) or 0)
+            ratings_count = int(getattr(restaurant, "ratings_count", 0) or 0)
+            score = cuisine_bonus + (avg_rating * 10.0) + (ratings_count * 0.25)
+            candidates.append((restaurant, score))
+
+    candidates.sort(key=lambda x: x[1], reverse=True)
+    restaurant_list = [r for (r, _s) in candidates[:limit]]
     
     serializer = RestaurantListSerializer(restaurant_list, many=True)
     return Response({
@@ -1335,7 +1469,8 @@ def popular_restaurants(request):
     limit = int(request.query_params.get('limit', 10))
     time_period = request.query_params.get('time_period', 'all').lower()
     
-    restaurants = RestaurantUserProfile.objects.filter(is_verified=True)
+    verified_qs = RestaurantUserProfile.objects.filter(is_verified=True)
+    restaurants = verified_qs if verified_qs.exists() else RestaurantUserProfile.objects.all()
     
     # Filter by time period
     if time_period == 'day':
@@ -1348,8 +1483,11 @@ def popular_restaurants(request):
         cutoff_date = timezone.now() - timedelta(days=30)
         restaurants = restaurants.filter(created_at__gte=cutoff_date)
     
-    # Sort by rating and number of ratings
-    restaurants = restaurants.order_by('-rating_avg', '-total_ratings')[:limit]
+    # Sort by rating and number of ratings (computed from RestaurantRating)
+    restaurants = restaurants.annotate(
+        avg_rating=Avg("ratings__rating"),
+        ratings_count=Count("ratings"),
+    ).order_by("-avg_rating", "-ratings_count", "-created_at")[:limit]
     
     serializer = RestaurantListSerializer(restaurants, many=True)
     return Response({
@@ -1414,13 +1552,16 @@ def user_recommendations_summary(request):
     - Popular recipes
     - Trending restaurants
     """
-    from django.db.models import Count, Avg, F
+    from django.db.models import Count, Avg, F, Q
     from datetime import timedelta
+    from django.db.models import Avg, Count
     
     user = request.user
     
     # Get user's favorite cuisines
-    user_favorite_recipes = Recipe.objects.filter(likes__user=user)
+    user_favorite_recipes = Recipe.objects.filter(
+        Q(likes__user=user) | Q(favorited_by__user=user) | Q(ratings__user=user)
+    ).distinct()
     favorite_cuisines = set(
         user_favorite_recipes.filter(
             cuisine_type__isnull=False
@@ -1428,13 +1569,28 @@ def user_recommendations_summary(request):
     )
     
     # 1. Personalized recipes
-    personalized_recipes = Recipe.objects.exclude(
-        Q(author=user) | Q(likes__user=user)
-    ).annotate(
-        likes_count=Count('likes'),
-        avg_rating=Avg('ratings__rating'),
-        engagement_score=Count('likes') + (Count('ratings') * 2) + (F('views_count') * 0.1)
-    ).order_by('-engagement_score')[:5]
+    prefs = _get_user_recipe_prefs(user)
+    base_qs_new = Recipe.objects.exclude(Q(author=user) | Q(id__in=prefs["interacted_ids"]))
+    base_qs_warm = Recipe.objects.exclude(Q(author=user))
+    if base_qs_new.count() > 0:
+        base_qs = base_qs_new
+    elif base_qs_warm.count() > 0:
+        base_qs = base_qs_warm
+    else:
+        base_qs = Recipe.objects.all()
+    personalized_candidates = list(
+        base_qs.annotate(
+            likes_count=Count("likes"),
+            ratings_count=Count("ratings"),
+            avg_rating=Avg("ratings__rating"),
+        ).order_by("-views_count")[:200]
+    )
+    if prefs["interacted_ids"]:
+        scored = [(r, _score_recipe_for_user(r, prefs)) for r in personalized_candidates]
+        scored.sort(key=lambda x: x[1], reverse=True)
+        personalized_recipes = [r for (r, _s) in scored[:5]]
+    else:
+        personalized_recipes = personalized_candidates[:5]
     
     # 2. Popular recipes (all time)
     popular_recipes_list = Recipe.objects.all().annotate(
@@ -1454,15 +1610,38 @@ def user_recommendations_summary(request):
         trending_score=F('views_count') + (F('likes_count') * 3) + (F('ratings_count') * 2)
     ).order_by('-trending_score')[:5]
     
-    # 4. Popular restaurants
-    popular_restaurants_list = RestaurantUserProfile.objects.filter(
-        is_verified=True
-    ).order_by('-rating_avg', '-total_ratings')[:5]
+    # 4. Popular restaurants (fallback to all if none verified)
+    verified_restaurants = RestaurantUserProfile.objects.filter(is_verified=True)
+    restaurants_base = verified_restaurants if verified_restaurants.exists() else RestaurantUserProfile.objects.all()
+    popular_restaurants_list = restaurants_base.annotate(
+        avg_rating=Avg("ratings__rating"),
+        ratings_count=Count("ratings"),
+    ).order_by("-avg_rating", "-ratings_count", "-created_at")[:5]
+
+    # 5. Personalized restaurants (no user location here; cuisine-preference + ratings)
+    user_cuisines = {c.strip().lower() for c in favorite_cuisines if c}
+    restaurant_candidates = list(
+        restaurants_base.annotate(
+            avg_rating=Avg("ratings__rating"),
+            ratings_count=Count("ratings"),
+        )[:200]
+    )
+    personalized_restaurants_scored = []
+    for r in restaurant_candidates:
+        cuisine = (r.cuisine_type or "").strip().lower()
+        cuisine_bonus = 5.0 if cuisine and any(pref in cuisine for pref in user_cuisines) else 0.0
+        avg_rating = float(getattr(r, "avg_rating", 0) or 0)
+        ratings_count = int(getattr(r, "ratings_count", 0) or 0)
+        score = cuisine_bonus + (avg_rating * 10.0) + (ratings_count * 0.25)
+        personalized_restaurants_scored.append((r, score))
+    personalized_restaurants_scored.sort(key=lambda x: x[1], reverse=True)
+    personalized_restaurants = [r for (r, _s) in personalized_restaurants_scored[:5]]
     
     return Response({
         'personalized_recipes': RecipeListSerializer(personalized_recipes, many=True, context={'request': request}).data,
         'popular_recipes': RecipeListSerializer(popular_recipes_list, many=True, context={'request': request}).data,
         'trending_recipes': RecipeListSerializer(trending_recipes_list, many=True, context={'request': request}).data,
+        'personalized_restaurants': RestaurantListSerializer(personalized_restaurants, many=True).data,
         'popular_restaurants': RestaurantListSerializer(popular_restaurants_list, many=True).data,
         'user_favorite_cuisines': list(favorite_cuisines)
     }, status=status.HTTP_200_OK)

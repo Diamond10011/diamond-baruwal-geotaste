@@ -75,11 +75,11 @@ export default function LandingPage() {
             </div>
             <div>
               <button className="text-gray-700 hover:text-orange-600 px-4 py-2 rounded-full transition-colors">
-               <Link to="/register">Sign Up</Link>
+               <Link to="/login">Sign In</Link>
               </button>
 
               <button className="bg-orange-600 text-white px-6 py-2 rounded-full hover:bg-orange-700 transition-all transform hover:scale-105">
-                <Link to="/login">Get Started</Link>
+                <Link to="/register">Get Started</Link>
               </button>
             </div>
           </div>

@@ -227,13 +227,12 @@ class FavoriteRecipe(models.Model):
 class RestaurantLocation(models.Model):
     """Restaurant location with geolocation data"""
     restaurant = models.OneToOneField(RestaurantUserProfile, on_delete=models.CASCADE, related_name='location')
-    latitude = models.DecimalField(max_digits=9, decimal_places=6)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6)
-    city = models.CharField(max_length=100)
-    country = models.CharField(max_length=100)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
     postal_code = models.CharField(max_length=20, blank=True)
-    phone_number = models.CharField(max_length=20)
-    website = models.URLField(blank=True, null=True)
+    phone_number = models.CharField(max_length=20, blank=True)
     hours_open = models.TimeField(blank=True, null=True)
     hours_close = models.TimeField(blank=True, null=True)
     is_open = models.BooleanField(default=True)
@@ -246,7 +245,7 @@ class RestaurantLocation(models.Model):
         ordering = ['-rating_avg']
     
     def __str__(self):
-        return f"{self.restaurant.restaurant_name} - {self.city}"
+        return f"{self.restaurant.restaurant_name} - {self.city or 'Location'}"
 
 
 class RestaurantMenu(models.Model):

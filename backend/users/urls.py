@@ -9,7 +9,7 @@ from .views import (
     recipe_list, recipe_detail, recipe_like, recipe_rating, user_recipes,
     user_favorite_recipes, remove_favorite_recipe,
     # Restaurant endpoints
-    restaurant_list, restaurant_detail, restaurant_nearby, restaurant_menu, restaurant_rating,
+    restaurant_list, restaurant_detail, restaurant_nearby, restaurant_menu, restaurant_rating, restaurant_location,
     # Store product endpoints
     store_products, store_product_detail,
     # Order endpoints
@@ -62,6 +62,7 @@ urlpatterns = [
     path('restaurants/nearby/', restaurant_nearby, name='restaurant_nearby'),
     path('restaurants/<str:restaurant_id>/menu/', restaurant_menu, name='restaurant_menu'),
     path('restaurants/<str:restaurant_id>/rating/', restaurant_rating, name='restaurant_rating'),
+    path('restaurant-location/', restaurant_location, name='restaurant_location'),
     
     # ==================== STORE PRODUCTS ====================
     path('store-products/', store_products, name='store_products'),

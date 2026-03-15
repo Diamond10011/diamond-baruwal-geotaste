@@ -509,12 +509,20 @@ class RestaurantMenuSerializer(serializers.ModelSerializer):
 class RestaurantLocationSerializer(serializers.ModelSerializer):
     """Serializer for restaurant location"""
     restaurant_name = serializers.CharField(source='restaurant.restaurant_name', read_only=True)
+    latitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    longitude = serializers.DecimalField(max_digits=9, decimal_places=6, required=False, allow_null=True)
+    city = serializers.CharField(required=False, allow_blank=True)
+    country = serializers.CharField(required=False, allow_blank=True)
+    postal_code = serializers.CharField(required=False, allow_blank=True)
+    phone_number = serializers.CharField(required=False, allow_blank=True)
+    hours_open = serializers.TimeField(required=False, allow_null=True)
+    hours_close = serializers.TimeField(required=False, allow_null=True)
     
     class Meta:
         model = RestaurantLocation
         fields = [
             'id', 'restaurant_name', 'latitude', 'longitude', 'city', 'country',
-            'postal_code', 'phone_number', 'website', 'hours_open', 'hours_close',
+            'postal_code', 'phone_number', 'hours_open', 'hours_close',
             'is_open', 'rating_avg', 'total_ratings', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'rating_avg', 'total_ratings', 'created_at', 'updated_at']

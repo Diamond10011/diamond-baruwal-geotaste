@@ -40,7 +40,6 @@ const AdminDashboard = () => {
   if (user?.role !== "admin") {
     return (
       <>
-        <Navbar />
         <Container className="pt-16">
           <div className="py-12 text-center">
             <p className="text-red-600 text-lg">
@@ -54,7 +53,6 @@ const AdminDashboard = () => {
 
   return (
     <>
-      <Navbar />
       <Container className="pt-16">
         <div className="py-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-8">

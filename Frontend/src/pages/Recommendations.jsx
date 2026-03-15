@@ -3,21 +3,24 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const API_BASE_URL = "http://localhost:8000/api";
+  const API_BASE_URL = "http://localhost:8000/api";
 
 const Recommendations = () => {
   const navigate = useNavigate();
-  const { user, addRecipeToFavorites, isFavoriteRecipe } = useAuth();
+  const { addRecipeToFavorites, isFavoriteRecipe } = useAuth();
   const [recommendations, setRecommendations] = useState({
     personalized_recipes: [],
     popular_recipes: [],
     trending_recipes: [],
     popular_restaurants: [],
+    personalized_restaurants: [],
     user_favorite_cuisines: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("personalized");
+  const [userLocation, setUserLocation] = useState(null);
+  const [restaurantRadiusKm, setRestaurantRadiusKm] = useState(10);
   const [filters, setFilters] = useState({
     cuisineType: "",
     difficulty: "",
@@ -52,7 +55,10 @@ const Recommendations = () => {
           },
         },
       );
-      setRecommendations(response.data);
+      setRecommendations((prev) => ({
+        ...prev,
+        ...response.data,
+      }));
       setError(null);
     } catch (err) {
       console.error("Error fetching recommendations:", err);
@@ -62,7 +68,30 @@ const Recommendations = () => {
     }
   };
 
-  const fetchFilteredRecommendations = async (type) => {
+  const requestLocationAndFetchRestaurants = () => {
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const loc = { latitude, longitude };
+        setUserLocation(loc);
+        fetchFilteredRecommendations("restaurants", loc);
+      },
+      (geoErr) => {
+        console.error("Geolocation error:", geoErr);
+        setError("Unable to get your location. Please allow location access.");
+        setLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
+
+  const fetchFilteredRecommendations = async (type, locationOverride) => {
     try {
       setLoading(true);
       let endpoint = "";
@@ -76,6 +105,16 @@ const Recommendations = () => {
         endpoint = `${API_BASE_URL}/recommendations/recipes/popular/?limit=${filters.limit}`;
       } else if (type === "trending") {
         endpoint = `${API_BASE_URL}/recommendations/recipes/trending/?limit=${filters.limit}`;
+      } else if (type === "restaurants") {
+        const lat = locationOverride?.latitude ?? userLocation?.latitude;
+        const lon = locationOverride?.longitude ?? userLocation?.longitude;
+        if (lat == null || lon == null) {
+          setLoading(false);
+          setError("Share your location to see nearby restaurant picks.");
+          return;
+        }
+        endpoint = `${API_BASE_URL}/recommendations/restaurants/?limit=${filters.limit}&latitude=${lat}&longitude=${lon}&radius=${restaurantRadiusKm}`;
+        if (filters.cuisineType) endpoint += `&cuisine_type=${filters.cuisineType}`;
       }
 
       const response = await axios.get(endpoint, {
@@ -90,6 +129,8 @@ const Recommendations = () => {
           type === "personalized" ? response.data.recommendations : [],
         popular_recipes: type === "popular" ? response.data.recipes : [],
         trending_recipes: type === "trending" ? response.data.recipes : [],
+        personalized_restaurants:
+          type === "restaurants" ? response.data.restaurants : [],
       });
       setError(null);
     } catch (err) {
@@ -269,10 +310,11 @@ const Recommendations = () => {
           ))}
         </div>
 
-        {/* Filters for Recipe Tabs */}
+        {/* Filters */}
         {(activeTab === "personalized" ||
           activeTab === "popular" ||
-          activeTab === "trending") && (
+          activeTab === "trending" ||
+          activeTab === "restaurants") && (
           <div className="bg-white rounded-2xl shadow-lg p-8 mb-10 border border-orange-100">
             <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               🔍 Filter Recommendations
@@ -301,6 +343,7 @@ const Recommendations = () => {
                   onChange={(e) =>
                     handleFilterChange("difficulty", e.target.value)
                   }
+                  disabled={activeTab === "restaurants"}
                   className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all font-medium"
                 >
                   <option value="">All Levels</option>
@@ -325,6 +368,30 @@ const Recommendations = () => {
                 </select>
               </div>
             </div>
+
+            {activeTab === "restaurants" && (
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-bold text-gray-700 mb-3">
+                    Nearby Radius: {restaurantRadiusKm} km
+                  </label>
+                  <input
+                    type="range"
+                    min="1"
+                    max="50"
+                    value={restaurantRadiusKm}
+                    onChange={(e) => setRestaurantRadiusKm(Number(e.target.value))}
+                    className="w-full accent-orange-600"
+                  />
+                </div>
+                <button
+                  onClick={requestLocationAndFetchRestaurants}
+                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all font-bold"
+                >
+                  Use My Location
+                </button>
+              </div>
+            )}
             <button
               onClick={handleApplyFilters}
               className="mt-6 px-8 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all font-bold"
@@ -341,9 +408,15 @@ const Recommendations = () => {
               <div className="bg-white rounded-2xl shadow-lg p-16 text-center border border-orange-100">
                 <p className="text-5xl mb-4">📝</p>
                 <p className="text-gray-600 text-lg mb-8 font-medium">
-                  No personalized recommendations available yet. Start liking
-                  and rating recipes!
+                  Not enough recipes to personalize yet. Like or rate more
+                  recipes, or add more recipes to the community.
                 </p>
+                <button
+                  onClick={() => navigate("/recipes")}
+                  className="px-8 py-3 bg-gradient-to-r from-orange-600 to-red-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all font-bold"
+                >
+                  Browse Recipes
+                </button>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -389,16 +462,28 @@ const Recommendations = () => {
 
         {activeTab === "restaurants" && (
           <div>
-            {recommendations.popular_restaurants.length === 0 ? (
+            {recommendations.personalized_restaurants.length === 0 ? (
               <div className="bg-white rounded-2xl shadow-lg p-16 text-center border border-orange-100">
                 <p className="text-5xl mb-4">🍽️</p>
                 <p className="text-gray-600 text-lg mb-8 font-medium">
-                  No restaurant recommendations available
+                  {userLocation
+                    ? "No nearby restaurant recommendations yet."
+                    : "Share your location to see nearby restaurant picks."}
                 </p>
+                {!userLocation && (
+                  <button
+                    onClick={requestLocationAndFetchRestaurants}
+                    className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:shadow-lg hover:scale-105 transition-all font-bold"
+                  >
+                    Use My Location
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {recommendations.popular_restaurants.map(renderRestaurantCard)}
+                {recommendations.personalized_restaurants.map(
+                  renderRestaurantCard,
+                )}
               </div>
             )}
           </div>
