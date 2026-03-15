@@ -11,14 +11,22 @@ from .views import (
     # Restaurant endpoints
     restaurant_list, restaurant_detail, restaurant_nearby, restaurant_menu, restaurant_rating, restaurant_location,
     # Store product endpoints
-    store_products, store_product_detail,
+    store_list, store_products, store_product_detail,
     # Order endpoints
     orders, order_detail,
     # Payment endpoints
     process_payment, payment_detail,
     # Recommendation endpoints
     recommend_recipes, popular_recipes, recommend_restaurants, popular_restaurants,
-    trending_recipes, user_recommendations_summary
+    trending_recipes, user_recommendations_summary,
+    # Admin management endpoints
+    admin_summary,
+    admin_users, admin_user_detail, admin_user_reset_password,
+    admin_recipes, admin_recipe_delete,
+    admin_restaurants, admin_restaurant_detail,
+    admin_stores, admin_store_detail,
+    admin_orders, admin_order_update,
+    admin_payments, admin_payment_update,
 )
 
 urlpatterns = [
@@ -46,6 +54,22 @@ urlpatterns = [
     # ==================== DASHBOARDS ====================
     path('admin-dashboard/', admin_dashboard, name='admin_dashboard'),
     path('user-dashboard/', user_dashboard, name='user_dashboard'),
+
+    # ==================== ADMIN MANAGEMENT ====================
+    path('admin/summary/', admin_summary, name='admin_summary'),
+    path('admin/users/', admin_users, name='admin_users'),
+    path('admin/users/<str:user_id>/', admin_user_detail, name='admin_user_detail'),
+    path('admin/users/<str:user_id>/reset-password/', admin_user_reset_password, name='admin_user_reset_password'),
+    path('admin/recipes/', admin_recipes, name='admin_recipes'),
+    path('admin/recipes/<str:recipe_id>/delete/', admin_recipe_delete, name='admin_recipe_delete'),
+    path('admin/restaurants/', admin_restaurants, name='admin_restaurants'),
+    path('admin/restaurants/<int:restaurant_id>/', admin_restaurant_detail, name='admin_restaurant_detail'),
+    path('admin/stores/', admin_stores, name='admin_stores'),
+    path('admin/stores/<int:store_id>/', admin_store_detail, name='admin_store_detail'),
+    path('admin/orders/', admin_orders, name='admin_orders'),
+    path('admin/orders/<str:order_id>/', admin_order_update, name='admin_order_update'),
+    path('admin/payments/', admin_payments, name='admin_payments'),
+    path('admin/payments/<str:payment_id>/', admin_payment_update, name='admin_payment_update'),
     
     # ==================== RECIPES ====================
     path('recipes/', recipe_list, name='recipe_list'),
@@ -65,6 +89,7 @@ urlpatterns = [
     path('restaurant-location/', restaurant_location, name='restaurant_location'),
     
     # ==================== STORE PRODUCTS ====================
+    path('stores/', store_list, name='store_list'),
     path('store-products/', store_products, name='store_products'),
     path('store-products/<int:product_id>/', store_product_detail, name='store_product_detail'),
     

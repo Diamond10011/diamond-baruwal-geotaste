@@ -660,9 +660,9 @@ const Recipes = () => {
                 {/* Content */}
                 <div className="p-6">
                   {/* Title */}
-                  <h3 className="text-xl font-bold text-gray-900 mb-3 line-clamp-2 hover:text-orange-600 transition-colors">
+                  <button onClick={() => navigate(`/recipes/${recipe.id}`)} className="text-xl font-bold text-gray-900 mb-3 line-clamp-2 cursor-pointer hover:text-orange-600  transition-colors">
                     {recipe.title}
-                  </h3>
+                  </button>
 
                   {/* Author */}
                   <div className="flex items-center gap-2 mb-4 pb-4 border-b border-gray-100">
@@ -672,10 +672,10 @@ const Recipes = () => {
                         : recipe.author_email.charAt(0).toUpperCase()}
                     </div>
                     <div>
+                      <p className="text-xs text-gray-500">Shared by Author</p>
                       <p className="text-sm font-semibold text-gray-800">
                         {recipe.author_name || recipe.author_email}
                       </p>
-                      <p className="text-xs text-gray-500">Shared by Author</p>
                     </div>
                   </div>
 

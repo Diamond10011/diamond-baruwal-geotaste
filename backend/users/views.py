@@ -395,6 +395,688 @@ def admin_dashboard(request):
     }, status=status.HTTP_200_OK)
 
 
+# ============================================================================
+# ADMIN MANAGEMENT ENDPOINTS
+# ============================================================================
+
+def _require_admin(request):
+    if not request.user.is_authenticated or not request.user.is_admin:
+        return Response({'error': 'Only admins can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
+    return None
+
+
+def _repair_bad_customuser_ids():
+    """
+    One-time repair for legacy/dev DBs where CustomUser.id contains non-UUID values
+    (e.g. '1' from an earlier AutoField schema).
+
+    This function rewrites bad ids to new UUIDs and updates known FK columns.
+    It uses raw SQL and temporarily disables SQLite FK checks to avoid constraint issues.
+    """
+    import uuid as _uuid
+    from django.db import connection, transaction
+
+    def _is_uuid(value):
+        try:
+            _uuid.UUID(str(value))
+            return True
+        except Exception:
+            return False
+
+    def _table_has_col(cur, table, col):
+        try:
+            cur.execute(f"PRAGMA table_info({table})")
+            return any(r[1] == col for r in cur.fetchall())
+        except Exception:
+            return False
+
+    with connection.cursor() as cur:
+        try:
+            cur.execute("SELECT id FROM users_customuser")
+        except Exception:
+            return 0
+        raw_ids = [r[0] for r in cur.fetchall()]
+
+    bad_ids = [rid for rid in raw_ids if not _is_uuid(rid)]
+    if not bad_ids:
+        return 0
+
+    # Tables/columns that reference CustomUser.id (UUID).
+    # Only update if the table/column exists in this DB.
+    fk_refs = [
+        ("users_userprofile", "user_id"),
+        ("users_storeuserprofile", "user_id"),
+        ("users_restaurantuserprofile", "user_id"),
+        ("users_otp", "user_id"),
+        ("users_passwordresettoken", "user_id"),
+        ("users_recipe", "author_id"),
+        ("users_reciperating", "user_id"),
+        ("users_recipelike", "user_id"),
+        ("users_favoriterecipe", "user_id"),
+        ("users_restaurantrating", "user_id"),
+        ("users_order", "customer_id"),
+        ("django_admin_log", "user_id"),
+    ]
+
+    repaired = 0
+    with transaction.atomic():
+        with connection.cursor() as cur:
+            # Disable FK checks during repair so we can rewrite ids safely.
+            cur.execute("PRAGMA foreign_keys=OFF")
+            for bad_id in bad_ids:
+                new_id = str(_uuid.uuid4())
+
+                # Update parent PK first.
+                cur.execute(
+                    "UPDATE users_customuser SET id = %s WHERE id = %s",
+                    [new_id, str(bad_id)],
+                )
+
+                # Update known FK references.
+                for table, col in fk_refs:
+                    if _table_has_col(cur, table, col):
+                        cur.execute(
+                            f"UPDATE {table} SET {col} = %s WHERE {col} = %s",
+                            [new_id, str(bad_id)],
+                        )
+
+                repaired += 1
+
+            cur.execute("PRAGMA foreign_keys=ON")
+
+    return repaired
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_summary(request):
+    """
+    Admin overview summary for the whole system.
+    """
+    from django.db.models import Count
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    users_by_role = {
+        row["role"]: row["c"]
+        for row in CustomUser.objects.values("role").annotate(c=Count("id"))
+    }
+    total_users = CustomUser.objects.count()
+
+    total_recipes = Recipe.objects.count()
+    total_restaurants = RestaurantUserProfile.objects.count()
+    total_stores = StoreUserProfile.objects.count()
+
+    pending_restaurant_verifications = RestaurantUserProfile.objects.filter(is_verified=False).count()
+    pending_store_verifications = StoreUserProfile.objects.filter(is_verified=False).count()
+
+    orders_by_status = {
+        row["status"]: row["c"]
+        for row in Order.objects.values("status").annotate(c=Count("id"))
+    }
+    total_orders = Order.objects.count()
+    total_payments = Payment.objects.count()
+
+    return Response(
+        {
+            "users": {
+                "total": total_users,
+                "by_role": users_by_role,
+                "email_verified": CustomUser.objects.filter(is_email_verified=True).count(),
+                "email_unverified": CustomUser.objects.filter(is_email_verified=False).count(),
+                "inactive": CustomUser.objects.filter(is_active=False).count(),
+            },
+            "content": {
+                "recipes": total_recipes,
+                "restaurants": total_restaurants,
+                "stores": total_stores,
+            },
+            "verifications": {
+                "restaurants_pending": pending_restaurant_verifications,
+                "stores_pending": pending_store_verifications,
+            },
+            "commerce": {
+                "orders_total": total_orders,
+                "orders_by_status": orders_by_status,
+                "payments_total": total_payments,
+            },
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_users(request):
+    """
+    Admin: list users.
+    Query params:
+    - q: search by email/name
+    - role: filter by role
+    - verified: true/false
+    - active: true/false
+    - limit, offset
+    """
+    from django.db.models import Q
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    # Auto-repair legacy/dev databases that still contain non-UUID user ids.
+    _repair_bad_customuser_ids()
+
+    q = (request.query_params.get("q") or "").strip()
+    role = (request.query_params.get("role") or "").strip()
+    verified = (request.query_params.get("verified") or "").strip().lower()
+    active = (request.query_params.get("active") or "").strip().lower()
+    limit = int(request.query_params.get("limit", 50))
+    offset = int(request.query_params.get("offset", 0))
+
+    qs = CustomUser.objects.all().select_related("profile").order_by("-created_at")
+    if role:
+        qs = qs.filter(role=role)
+    if verified in {"true", "false"}:
+        qs = qs.filter(is_email_verified=(verified == "true"))
+    if active in {"true", "false"}:
+        qs = qs.filter(is_active=(active == "true"))
+    if q:
+        qs = qs.filter(
+            Q(email__icontains=q)
+            | Q(profile__first_name__icontains=q)
+            | Q(profile__last_name__icontains=q)
+        )
+
+    total = qs.count()
+    users = qs[offset:offset + limit]
+    data = []
+    for u in users:
+        p = getattr(u, "profile", None)
+        data.append(
+            {
+                "id": str(u.id),
+                "email": u.email,
+                "role": u.role,
+                "is_email_verified": u.is_email_verified,
+                "is_active": u.is_active,
+                "created_at": u.created_at,
+                "profile": {
+                    "first_name": getattr(p, "first_name", "") if p else "",
+                    "last_name": getattr(p, "last_name", "") if p else "",
+                    "phone_number": getattr(p, "phone_number", "") if p else "",
+                    "location": getattr(p, "location", "") if p else "",
+                },
+            }
+        )
+
+    return Response({"count": total, "results": data, "limit": limit, "offset": offset}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_user_detail(request, user_id):
+    """
+    Admin: get/update/delete a user.
+    PUT accepts:
+    - role, is_email_verified, is_active
+    - profile: {first_name,last_name,phone_number,location,bio,dark_mode}
+    """
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    parsed = _parse_uuid(user_id)
+    if not parsed:
+        return Response({"error": "Invalid user id"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        u = CustomUser.objects.select_related("profile").get(id=parsed)
+    except CustomUser.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "GET":
+        p = getattr(u, "profile", None)
+        return Response(
+            {
+                "id": str(u.id),
+                "email": u.email,
+                "role": u.role,
+                "is_email_verified": u.is_email_verified,
+                "is_active": u.is_active,
+                "created_at": u.created_at,
+                "profile": UserProfileSerializer(p).data if p else None,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    if request.method == "DELETE":
+        # Prevent locking out the last admin.
+        if u.role == "admin" and CustomUser.objects.filter(role="admin").exclude(id=u.id).count() == 0:
+            return Response({"error": "Cannot delete the last admin account"}, status=status.HTTP_400_BAD_REQUEST)
+        u.delete()
+        return Response({"message": "User deleted"}, status=status.HTTP_200_OK)
+
+    # PUT
+    data = request.data or {}
+    role = data.get("role")
+    if role and role in dict(CustomUser.ROLE_CHOICES):
+        u.role = role
+        # Ensure role-specific profile exists if needed.
+        if role == "store":
+            StoreUserProfile.objects.get_or_create(user=u, defaults={"store_name": "", "store_address": ""})
+        if role == "restaurant":
+            RestaurantUserProfile.objects.get_or_create(user=u, defaults={"restaurant_name": "", "restaurant_address": ""})
+    if "is_email_verified" in data:
+        u.is_email_verified = bool(data.get("is_email_verified"))
+    if "is_active" in data:
+        u.is_active = bool(data.get("is_active"))
+    u.save()
+
+    profile_payload = data.get("profile") or {}
+    if profile_payload:
+        profile, _created = UserProfile.objects.get_or_create(user=u)
+        # Update a safe subset of fields.
+        for field in ["first_name", "last_name", "phone_number", "location", "bio", "dark_mode"]:
+            if field in profile_payload:
+                setattr(profile, field, profile_payload.get(field))
+        profile.save()
+
+    return Response({"message": "User updated"}, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_user_reset_password(request, user_id):
+    """
+    Admin: reset a user's password.
+    Body: {new_password: "..."} or omit to generate a random one.
+    """
+    from django.contrib.auth.password_validation import validate_password
+    from django.utils.crypto import get_random_string
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    parsed = _parse_uuid(user_id)
+    if not parsed:
+        return Response({"error": "Invalid user id"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        u = CustomUser.objects.get(id=parsed)
+    except CustomUser.DoesNotExist:
+        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    new_password = (request.data or {}).get("new_password")
+    if not new_password:
+        # 16 chars, letters/digits
+        new_password = get_random_string(16)
+    else:
+        try:
+            validate_password(new_password, user=u)
+        except Exception as exc:
+            return Response({"error": "Password validation failed", "details": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
+
+    u.set_password(new_password)
+    u.save()
+    return Response({"message": "Password reset", "new_password": new_password}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_recipes(request):
+    """
+    Admin: list recipes.
+    Query params: q, cuisine_type, difficulty, limit, offset
+    """
+    from django.db.models import Q, Count, Avg
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    q = (request.query_params.get("q") or "").strip()
+    cuisine = (request.query_params.get("cuisine_type") or "").strip()
+    difficulty = (request.query_params.get("difficulty") or "").strip()
+    limit = int(request.query_params.get("limit", 50))
+    offset = int(request.query_params.get("offset", 0))
+
+    qs = Recipe.objects.all().select_related("author").order_by("-created_at")
+    if cuisine:
+        qs = qs.filter(cuisine_type__icontains=cuisine)
+    if difficulty:
+        qs = qs.filter(difficulty=difficulty)
+    if q:
+        qs = qs.filter(Q(title__icontains=q) | Q(description__icontains=q) | Q(author__email__icontains=q))
+
+    qs = qs.annotate(likes_count=Count("likes"), ratings_count=Count("ratings"), avg_rating=Avg("ratings__rating"))
+    total = qs.count()
+    rows = []
+    for r in qs[offset:offset + limit]:
+        rows.append(
+            {
+                "id": str(r.id),
+                "title": r.title,
+                "author_email": r.author.email,
+                "cuisine_type": r.cuisine_type,
+                "difficulty": r.difficulty,
+                "views_count": r.views_count,
+                "likes_count": getattr(r, "likes_count", 0) or 0,
+                "ratings_count": getattr(r, "ratings_count", 0) or 0,
+                "avg_rating": float(getattr(r, "avg_rating", 0) or 0),
+                "created_at": r.created_at,
+            }
+        )
+    return Response({"count": total, "results": rows, "limit": limit, "offset": offset}, status=status.HTTP_200_OK)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_recipe_delete(request, recipe_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    parsed = _parse_uuid(recipe_id)
+    if not parsed:
+        return Response({"error": "Invalid recipe id"}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        r = Recipe.objects.get(id=parsed)
+    except Recipe.DoesNotExist:
+        return Response({"error": "Recipe not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    r.delete()
+    return Response({"message": "Recipe deleted"}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_restaurants(request):
+    """
+    Admin: list restaurant profiles.
+    Query params: q, verified(true/false), limit, offset
+    """
+    from django.db.models import Q
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    q = (request.query_params.get("q") or "").strip()
+    verified = (request.query_params.get("verified") or "").strip().lower()
+    limit = int(request.query_params.get("limit", 50))
+    offset = int(request.query_params.get("offset", 0))
+
+    qs = RestaurantUserProfile.objects.all().select_related("user").order_by("-created_at")
+    if verified in {"true", "false"}:
+        qs = qs.filter(is_verified=(verified == "true"))
+    if q:
+        qs = qs.filter(
+            Q(restaurant_name__icontains=q)
+            | Q(restaurant_address__icontains=q)
+            | Q(cuisine_type__icontains=q)
+            | Q(user__email__icontains=q)
+        )
+    total = qs.count()
+    results = []
+    for rp in qs[offset:offset + limit]:
+        loc = getattr(rp, "location", None)
+        results.append(
+            {
+                "id": rp.id,
+                "user_id": str(rp.user_id),
+                "user_email": rp.user.email,
+                "restaurant_name": rp.restaurant_name,
+                "restaurant_address": rp.restaurant_address,
+                "restaurant_description": rp.restaurant_description,
+                "cuisine_type": rp.cuisine_type,
+                "is_verified": rp.is_verified,
+                "location": RestaurantLocationSerializer(loc).data if loc else None,
+                "created_at": rp.created_at,
+            }
+        )
+    return Response({"count": total, "results": results, "limit": limit, "offset": offset}, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_restaurant_detail(request, restaurant_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        rp = RestaurantUserProfile.objects.select_related("user").get(id=restaurant_id)
+    except RestaurantUserProfile.DoesNotExist:
+        return Response({"error": "Restaurant not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        rp.delete()
+        return Response({"message": "Restaurant deleted"}, status=status.HTTP_200_OK)
+
+    serializer = RestaurantUserProfileSerializer(rp, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({"message": "Restaurant updated", "restaurant": serializer.data}, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_stores(request):
+    """
+    Admin: list store profiles.
+    Query params: q, verified(true/false), limit, offset
+    """
+    from django.db.models import Q
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    q = (request.query_params.get("q") or "").strip()
+    verified = (request.query_params.get("verified") or "").strip().lower()
+    limit = int(request.query_params.get("limit", 50))
+    offset = int(request.query_params.get("offset", 0))
+
+    qs = StoreUserProfile.objects.all().select_related("user").order_by("-created_at")
+    if verified in {"true", "false"}:
+        qs = qs.filter(is_verified=(verified == "true"))
+    if q:
+        qs = qs.filter(
+            Q(store_name__icontains=q)
+            | Q(store_address__icontains=q)
+            | Q(store_description__icontains=q)
+            | Q(user__email__icontains=q)
+        )
+    total = qs.count()
+    serializer = StoreUserProfileSerializer(qs[offset:offset + limit], many=True)
+    return Response({"count": total, "results": serializer.data, "limit": limit, "offset": offset}, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_store_detail(request, store_id):
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        sp = StoreUserProfile.objects.select_related("user").get(id=store_id)
+    except StoreUserProfile.DoesNotExist:
+        return Response({"error": "Store not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    if request.method == "DELETE":
+        sp.delete()
+        return Response({"message": "Store deleted"}, status=status.HTTP_200_OK)
+
+    serializer = StoreUserProfileSerializer(sp, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({"message": "Store updated", "store": serializer.data}, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_orders(request):
+    """
+    Admin: list orders.
+    Query params: status, q(order_id/customer/store), limit, offset
+    """
+    from django.db.models import Q
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    status_filter = (request.query_params.get("status") or "").strip()
+    q = (request.query_params.get("q") or "").strip()
+    limit = int(request.query_params.get("limit", 50))
+    offset = int(request.query_params.get("offset", 0))
+
+    qs = Order.objects.all().select_related("customer", "store").order_by("-created_at")
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if q:
+        qs = qs.filter(
+            Q(order_id__icontains=q)
+            | Q(customer__email__icontains=q)
+            | Q(store__store_name__icontains=q)
+        )
+    total = qs.count()
+    results = []
+    for o in qs[offset:offset + limit]:
+        results.append(
+            {
+                "order_id": o.order_id,
+                "status": o.status,
+                "customer_email": o.customer.email,
+                "store_id": o.store_id,
+                "store_name": o.store.store_name,
+                "subtotal": o.subtotal,
+                "tax": o.tax,
+                "total_amount": o.total_amount,
+                "delivery_address": o.delivery_address,
+                "created_at": o.created_at,
+                "items_count": o.items.count(),
+                "has_payment": hasattr(o, "payment"),
+            }
+        )
+    return Response({"count": total, "results": results, "limit": limit, "offset": offset}, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def admin_order_update(request, order_id):
+    """
+    Admin: update order status/notes.
+    Body: {status, notes, delivery_address}
+    """
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        o = Order.objects.get(order_id=order_id)
+    except Order.DoesNotExist:
+        return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    data = request.data or {}
+    if "status" in data:
+        new_status = data.get("status")
+        valid = {s for (s, _label) in Order.STATUS_CHOICES}
+        if new_status not in valid:
+            return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+        o.status = new_status
+    if "notes" in data:
+        o.notes = data.get("notes") or ""
+    if "delivery_address" in data:
+        o.delivery_address = data.get("delivery_address") or ""
+    o.save()
+    return Response({"message": "Order updated", "order": OrderSerializer(o).data}, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_payments(request):
+    """
+    Admin: list payments.
+    Query params: status, q(payment_id/order_id/customer/store), limit, offset
+    """
+    from django.db.models import Q
+
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    status_filter = (request.query_params.get("status") or "").strip()
+    q = (request.query_params.get("q") or "").strip()
+    limit = int(request.query_params.get("limit", 50))
+    offset = int(request.query_params.get("offset", 0))
+
+    qs = Payment.objects.all().select_related("order", "order__customer", "order__store").order_by("-created_at")
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if q:
+        qs = qs.filter(
+            Q(payment_id__icontains=q)
+            | Q(transaction_id__icontains=q)
+            | Q(order__order_id__icontains=q)
+            | Q(order__customer__email__icontains=q)
+            | Q(order__store__store_name__icontains=q)
+        )
+    total = qs.count()
+    results = []
+    for p in qs[offset:offset + limit]:
+        results.append(
+            {
+                "payment_id": p.payment_id,
+                "status": p.status,
+                "payment_method": p.payment_method,
+                "amount": p.amount,
+                "transaction_id": p.transaction_id,
+                "order_id": p.order.order_id,
+                "customer_email": p.order.customer.email,
+                "store_name": p.order.store.store_name,
+                "created_at": p.created_at,
+            }
+        )
+    return Response({"count": total, "results": results, "limit": limit, "offset": offset}, status=status.HTTP_200_OK)
+
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def admin_payment_update(request, payment_id):
+    """
+    Admin: update payment status/notes.
+    Body: {status, notes}
+    """
+    denied = _require_admin(request)
+    if denied:
+        return denied
+
+    try:
+        p = Payment.objects.get(payment_id=payment_id)
+    except Payment.DoesNotExist:
+        return Response({"error": "Payment not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    data = request.data or {}
+    if "status" in data:
+        new_status = data.get("status")
+        valid = {s for (s, _label) in Payment.STATUS_CHOICES}
+        if new_status not in valid:
+            return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+        p.status = new_status
+    if "notes" in data:
+        p.notes = data.get("notes") or ""
+    p.save()
+    return Response({"message": "Payment updated", "payment": PaymentSerializer(p).data}, status=status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_dashboard(request):
@@ -839,6 +1521,20 @@ def restaurant_location(request):
 # STORE PRODUCT ENDPOINTS
 # ============================================================================
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def store_list(request):
+    """Public list of stores (profiles)."""
+    stores = StoreUserProfile.objects.all().order_by("-created_at")
+    serializer = StoreUserProfileSerializer(stores, many=True)
+    return Response(
+        {
+            "count": stores.count(),
+            "stores": serializer.data,
+        },
+        status=status.HTTP_200_OK,
+    )
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def store_products(request):
@@ -852,6 +1548,9 @@ def store_products(request):
             try:
                 store = StoreUserProfile.objects.get(id=store_id)
                 products = store.products.all()
+                # For non-owners, only expose products the store has made available.
+                if request.user.role != 'store' or store.user_id != request.user.id:
+                    products = products.filter(is_available=True)
             except StoreUserProfile.DoesNotExist:
                 return Response({'error': 'Store not found'}, status=status.HTTP_404_NOT_FOUND)
         else:
@@ -936,7 +1635,10 @@ def orders(request):
     POST: Create a new order
     """
     if request.method == 'GET':
-        user_orders = Order.objects.filter(customer=request.user).order_by('-created_at')
+        if request.user.role == 'store':
+            user_orders = Order.objects.filter(store__user=request.user).order_by('-created_at')
+        else:
+            user_orders = Order.objects.filter(customer=request.user).order_by('-created_at')
         serializer = OrderSerializer(user_orders, many=True)
         return Response({
             'count': user_orders.count(),
@@ -975,11 +1677,16 @@ def orders(request):
         quantity = item.get('quantity', 1)
         
         try:
-            product = StoreProduct.objects.get(id=product_id)
+            # Ensure items belong to the selected store.
+            product = StoreProduct.objects.get(id=product_id, store=store)
         except StoreProduct.DoesNotExist:
             order.delete()
             return Response({'error': f'Product {product_id} not found'}, status=status.HTTP_404_NOT_FOUND)
         
+        if not product.is_available:
+            order.delete()
+            return Response({'error': f'{product.name} is not available'}, status=status.HTTP_400_BAD_REQUEST)
+
         if product.stock < quantity:
             order.delete()
             return Response({'error': f'{product.name} has insufficient stock'}, status=status.HTTP_400_BAD_REQUEST)
@@ -992,6 +1699,9 @@ def orders(request):
             price=product.price,
             subtotal=item_subtotal
         )
+        # Reduce stock so future buyers see accurate availability.
+        product.stock = product.stock - int(quantity)
+        product.save(update_fields=['stock'])
         subtotal += item_subtotal
     
     # Calculate tax and total

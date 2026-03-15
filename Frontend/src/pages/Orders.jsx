@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";
 import { Alert } from "../components/FormComponents";
 import axios from "axios";
-import { Link } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 const API_BASE_URL = "http://localhost:8000/api";
 
 const Orders = () => {
-  const { user } = useAuth();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("browse");
   const [stores, setStores] = useState([]);
   const [storeProducts, setStoreProducts] = useState({});
@@ -29,13 +28,24 @@ const Orders = () => {
     fetchOrders();
   }, []);
 
+  useEffect(() => {
+    const targetStoreId = location.state?.storeId;
+    if (!targetStoreId || stores.length === 0) return;
+    const target = stores.find((s) => s.id === targetStoreId);
+    if (target) {
+      setActiveTab("browse");
+      setSelectedStore(null);
+      handleSelectStore(target);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stores, location.state]);
+
   const fetchStores = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/restaurants/`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const response = await axios.get(`${API_BASE_URL}/stores/`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
-      // For demo, we'll use restaurants as stores
-      setStores(response.data.restaurants || []);
+      setStores(response.data.stores || []);
     } catch (err) {
       console.error("Failed to load stores:", err);
     }
@@ -46,7 +56,7 @@ const Orders = () => {
       setLoading(true);
       const response = await axios.get(
         `${API_BASE_URL}/store-products/?store_id=${storeId}`,
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
       );
       setStoreProducts((prev) => ({
         ...prev,
@@ -62,7 +72,7 @@ const Orders = () => {
   const fetchOrders = async () => {
     try {
       const response = await axios.get(`${API_BASE_URL}/orders/`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       });
       setOrders(response.data.orders || []);
     } catch (err) {
@@ -102,7 +112,7 @@ const Orders = () => {
           product_id: product.id,
           product_name: product.name,
           store_id: selectedStore.id,
-          store_name: selectedStore.restaurant_name,
+          store_name: selectedStore.store_name,
           price: product.price,
           quantity: 1,
         },
@@ -161,7 +171,7 @@ const Orders = () => {
           })),
           delivery_address: deliveryAddress,
         },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
       );
 
       const orderId = orderResponse.data.order.order_id;
@@ -174,7 +184,7 @@ const Orders = () => {
           order_id: orderId,
           payment_method: paymentMethod,
         },
-        { headers: { Authorization: `Bearer ${token}` } },
+        { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
       );
 
       setSuccess("Order placed successfully! Payment processed.");
@@ -227,7 +237,7 @@ const Orders = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            � Orders & Shopping
+            Orders & Shopping
           </h1>
           <p className="text-gray-600">
             Browse stores, add items to cart, and manage your orders
@@ -244,7 +254,7 @@ const Orders = () => {
                 : "text-gray-600 border-transparent hover:text-green-500"
             }`}
           >
-            🏪 Browse Stores
+            Browse Stores
           </button>
           <button
             onClick={() => setActiveTab("cart")}
@@ -254,7 +264,7 @@ const Orders = () => {
                 : "text-gray-600 border-transparent hover:text-green-500"
             }`}
           >
-            🛍️ Cart ({cart.length})
+            Cart ({cart.length})
           </button>
           <button
             onClick={() => setActiveTab("orders")}
@@ -264,7 +274,7 @@ const Orders = () => {
                 : "text-gray-600 border-transparent hover:text-green-500"
             }`}
           >
-            📦 My Orders
+            My Orders
           </button>
         </div>
 
@@ -305,12 +315,17 @@ const Orders = () => {
                     >
                       <div className="p-6">
                         <h3 className="font-bold text-lg text-gray-900 mb-2">
-                          {store.restaurant_name}
+                          {store.store_name || "Store"}
                         </h3>
                         <p className="text-gray-600 text-sm mb-4">
-                          {store.restaurant_description ||
+                          {store.store_description ||
                             "Fresh products available"}
                         </p>
+                        {store.store_address && (
+                          <p className="text-gray-500 text-xs mb-2">
+                            {store.store_address}
+                          </p>
+                        )}
 
                         {selectedStore?.id === store.id &&
                           storeProducts[store.id] && (
@@ -358,7 +373,7 @@ const Orders = () => {
                           }`}
                         >
                           {selectedStore?.id === store.id
-                            ? "✓ Viewing Items"
+                            ? "Viewing Items"
                             : "View Items"}
                         </button>
                       </div>
@@ -417,7 +432,7 @@ const Orders = () => {
                             }
                             className="px-2 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
                           >
-                            −
+                            -
                           </button>
                           <span className="w-8 text-center font-semibold">
                             {item.quantity}
@@ -490,9 +505,9 @@ const Orders = () => {
                         onChange={(e) => setPaymentMethod(e.target.value)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                       >
-                        <option value="demo">💳 Demo Payment</option>
-                        <option value="card">💳 Credit/Debit Card</option>
-                        <option value="wallet">🎁 Wallet</option>
+                        <option value="demo">Demo Payment</option>
+                        <option value="card">Credit/Debit Card</option>
+                        <option value="wallet">Wallet</option>
                       </select>
                     </div>
                   </div>
@@ -541,7 +556,6 @@ const Orders = () => {
 
             {filteredOrders.length === 0 ? (
               <div className="bg-white rounded-lg shadow-md p-12 text-center">
-                <p className="text-3xl mb-4">📭</p>
                 <p className="text-gray-600 text-lg mb-6">
                   {filter === "all" ? "No orders yet" : `No ${filter} orders`}
                 </p>
@@ -598,7 +612,7 @@ const Orders = () => {
                         <ul className="space-y-1">
                           {order.items.map((item, idx) => (
                             <li key={idx} className="text-sm text-gray-600">
-                              • {item.product_name} x {item.quantity} @ Rs.{" "}
+                              - {item.product_name} x {item.quantity} @ Rs.{" "}
                               {item.price}
                             </li>
                           ))}
@@ -608,7 +622,7 @@ const Orders = () => {
 
                     {order.delivery_address && (
                       <div className="p-3 bg-blue-50 rounded-lg text-sm text-blue-800">
-                        📍 Delivery to: {order.delivery_address}
+                        Delivery to: {order.delivery_address}
                       </div>
                     )}
                   </div>

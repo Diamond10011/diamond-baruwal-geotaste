@@ -36,7 +36,8 @@ const Navbar = () => {
     { to: "/restaurants", label: "Restaurants", icon: <Search className="w-4 h-4" />, roles: ["admin", "restaurant", "chef", "normal", "customer"] },
     { to: "/admin-dashboard", label: "Admin", icon: <LayoutDashboard className="w-4 h-4" />, roles: ["admin"] },
     { to: "/restaurant-profile", label: "Manage Restaurant", icon: <UtensilsCrossed className="w-4 h-4" />, roles: ["restaurant"] },
-    { to: "/stores", label: "Store", icon: <Store className="w-4 h-4" />, roles: ["store", "customer", "normal"] },
+    { to: "/store-profile", label: "Manage Store", icon: <Store className="w-4 h-4" />, roles: ["store"] },
+    { to: "/stores", label: "Stores", icon: <Store className="w-4 h-4" />, roles: ["store", "customer", "normal"] },
   ];
 
   const visibleLinks = allLinks.filter((link) =>
