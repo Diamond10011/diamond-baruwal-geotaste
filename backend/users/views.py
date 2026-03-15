@@ -1495,6 +1495,7 @@ def restaurant_location(request):
             'city': '',
             'country': '',
             'phone_number': '',
+            'website': '',
         }
     )
     
@@ -1503,7 +1504,23 @@ def restaurant_location(request):
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     elif request.method == 'POST' or request.method == 'PUT':
-        serializer = RestaurantLocationSerializer(location, data=request.data, partial=True)
+        # Normalize lat/lon to match DecimalField(max_digits=9, decimal_places=6).
+        # Browsers often provide many decimal places; DRF will reject that unless we round first.
+        from decimal import Decimal, ROUND_HALF_UP
+
+        data = request.data.copy() if hasattr(request.data, "copy") else dict(request.data)
+        for key in ("latitude", "longitude"):
+            value = data.get(key, None)
+            if value in (None, ""):
+                continue
+            try:
+                dec = Decimal(str(value)).quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+                data[key] = str(dec)
+            except Exception:
+                # Let the serializer raise a helpful validation error if it's still invalid.
+                pass
+
+        serializer = RestaurantLocationSerializer(location, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response({

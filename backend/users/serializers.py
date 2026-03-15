@@ -515,6 +515,7 @@ class RestaurantLocationSerializer(serializers.ModelSerializer):
     country = serializers.CharField(required=False, allow_blank=True)
     postal_code = serializers.CharField(required=False, allow_blank=True)
     phone_number = serializers.CharField(required=False, allow_blank=True)
+    website = serializers.URLField(required=False, allow_blank=True, allow_null=True)
     hours_open = serializers.TimeField(required=False, allow_null=True)
     hours_close = serializers.TimeField(required=False, allow_null=True)
     
@@ -522,7 +523,7 @@ class RestaurantLocationSerializer(serializers.ModelSerializer):
         model = RestaurantLocation
         fields = [
             'id', 'restaurant_name', 'latitude', 'longitude', 'city', 'country',
-            'postal_code', 'phone_number', 'hours_open', 'hours_close',
+            'postal_code', 'phone_number', 'website', 'hours_open', 'hours_close',
             'is_open', 'rating_avg', 'total_ratings', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'rating_avg', 'total_ratings', 'created_at', 'updated_at']

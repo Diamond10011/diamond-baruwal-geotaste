@@ -22,6 +22,7 @@ const RestaurantProfileManagement = () => {
     country: "",
     postal_code: "",
     phone_number: "",
+    website: "",
     hours_open: "",
     hours_close: "",
   });
@@ -85,6 +86,7 @@ const RestaurantProfileManagement = () => {
           country: locationResponse.data.country || "",
           postal_code: locationResponse.data.postal_code || "",
           phone_number: locationResponse.data.phone_number || "",
+          website: locationResponse.data.website || "",
           hours_open: locationResponse.data.hours_open || "",
           hours_close: locationResponse.data.hours_close || "",
         });
@@ -171,21 +173,27 @@ const RestaurantProfileManagement = () => {
       const country = (locationData.country || "").trim();
       const postalCode = (locationData.postal_code || "").trim();
       const phoneNumber = (locationData.phone_number || "").trim();
+      const website = (locationData.website || "").trim();
+
+      const toDecimal6 = (value) => {
+        if (value === null || value === undefined || value === "") return null;
+        const n = Number(value);
+        if (Number.isNaN(n)) return null;
+        // Backend allows max 6 decimal places.
+        return Number(n.toFixed(6));
+      };
 
       const response = await axios.put(
         `${API_BASE_URL}/restaurant-location/`,
         {
-          latitude: locationData.latitude
-            ? parseFloat(locationData.latitude)
-            : null,
-          longitude: locationData.longitude
-            ? parseFloat(locationData.longitude)
-            : null,
+          latitude: toDecimal6(locationData.latitude),
+          longitude: toDecimal6(locationData.longitude),
           // These are CharFields in DRF: send "" to clear, not null (null triggers 400).
           city,
           country,
           postal_code: postalCode,
           phone_number: phoneNumber,
+          website,
           // TimeField allows null; HTML time input gives "HH:MM" (valid).
           hours_open: locationData.hours_open ? locationData.hours_open : null,
           hours_close: locationData.hours_close ? locationData.hours_close : null,
@@ -268,8 +276,8 @@ const RestaurantProfileManagement = () => {
         const { latitude, longitude } = position.coords;
         setLocationData((prev) => ({
           ...prev,
-          latitude: latitude.toString(),
-          longitude: longitude.toString(),
+          latitude: Number(latitude).toFixed(6),
+          longitude: Number(longitude).toFixed(6),
         }));
         setSuccess("Location captured successfully! Click Save to store it.");
         setLoading(false);
@@ -533,6 +541,19 @@ const RestaurantProfileManagement = () => {
                         }))
                       }
                       placeholder="Phone Number"
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+
+                    <input
+                      type="url"
+                      value={locationData.website}
+                      onChange={(e) =>
+                        setLocationData((prev) => ({
+                          ...prev,
+                          website: e.target.value,
+                        }))
+                      }
+                      placeholder="Website (optional)"
                       className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
                     />
                   </div>

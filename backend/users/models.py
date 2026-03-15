@@ -233,6 +233,7 @@ class RestaurantLocation(models.Model):
     country = models.CharField(max_length=100, blank=True)
     postal_code = models.CharField(max_length=20, blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
+    website = models.URLField(blank=True, null=True)
     hours_open = models.TimeField(blank=True, null=True)
     hours_close = models.TimeField(blank=True, null=True)
     is_open = models.BooleanField(default=True)
