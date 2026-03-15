@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import GuestRoute from "./components/GuestRoute";
 import Navbar from "./components/Navbar";
 
 // Auth Pages
@@ -28,6 +29,7 @@ import RestaurantProfile from "./pages/RestaurantProfile";
 import Stores from "./pages/Stores";
 import Orders from "./pages/Orders";
 import LandingPage from "./pages/LandingPage";
+import NotFound from "./pages/NotFound";
 
 // Dashboard Pages
 import UserDashboard from "./pages/Dashboard/UserDashboard";
@@ -50,12 +52,47 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          {/* Public Routes - No Navbar */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
+          {/* Public Routes - No Navbar - Only accessible when NOT logged in */}
+          <Route
+            path="/"
+            element={
+              <GuestRoute>
+                <LandingPage />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <GuestRoute>
+                <Login />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <GuestRoute>
+                <Register />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <GuestRoute>
+                <ForgotPassword />
+              </GuestRoute>
+            }
+          />
+          <Route
+            path="/verify-email"
+            element={
+              <GuestRoute>
+                <VerifyEmail />
+              </GuestRoute>
+            }
+          />
 
           {/* Protected Routes - With Navbar Layout */}
           <Route
@@ -68,7 +105,6 @@ export default function App() {
             {/* Dashboard Routes */}
             <Route path="/home" element={<Home />} />
             <Route path="/dashboard" element={<UserDashboard />} />
-
             {/* Admin Routes */}
             <Route
               path="/admin-dashboard"
@@ -78,10 +114,8 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Profile Routes */}
             <Route path="/profile" element={<Profile />} />
-
             {/* Store User Routes */}
             <Route
               path="/store-profile"
@@ -91,7 +125,6 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
             {/* Restaurant User Routes */}
             <Route
               path="/restaurant-profile"
@@ -101,24 +134,21 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
-            {/* Recipe Routes */}
+            {/* Recipe Routes */}{" "}
             <Route path="/recipes" element={<Recipes />} />
             <Route path="/recipes/:id" element={<RecipeDetail />} />
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/recommendations" element={<Recommendations />} />
-
             {/* Restaurant Routes */}
             <Route path="/restaurants" element={<RestaurantSearch />} />
             <Route path="/restaurants/:id" element={<RestaurantProfile />} />
-
             {/* Store Routes (for normal/customer users) */}
             <Route path="/stores" element={<Stores />} />
             <Route path="/orders" element={<Orders />} />
           </Route>
 
-          {/* Catch all - redirect to home or login */}
-          <Route path="*" element={<Navigate to="/home" replace />} />
+          {/* Catch all - show 404 page */}
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </Router>
     </AuthProvider>

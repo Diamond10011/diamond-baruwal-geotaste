@@ -13,6 +13,7 @@ const RestaurantProfile = () => {
   const [restaurant, setRestaurant] = useState(null);
   const [menu, setMenu] = useState([]);
   const [ratings, setRatings] = useState([]);
+  const [myRating, setMyRating] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("details");
@@ -31,21 +32,27 @@ const RestaurantProfile = () => {
   const fetchRestaurantDetails = async () => {
     try {
       setLoading(true);
-      const [restaurantRes, menuRes, ratingsRes] = await Promise.all([
+      const [restaurantRes, menuRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/restaurants/${id}/`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(`${API_BASE_URL}/restaurants/${id}/menu/`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_BASE_URL}/restaurants/${id}/rating/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
       ]);
 
       setRestaurant(restaurantRes.data);
       setMenu(menuRes.data.menu || []);
-      setRatings(ratingsRes.data.ratings || []);
+      setRatings(restaurantRes.data.ratings || []);
+      setMyRating(restaurantRes.data.user_rating || null);
+      if (restaurantRes.data.user_rating) {
+        setNewRating({
+          rating: restaurantRes.data.user_rating.rating ?? 5,
+          comment: restaurantRes.data.user_rating.comment || "",
+        });
+      } else {
+        setNewRating({ rating: 5, comment: "" });
+      }
       setError(null);
     } catch (err) {
       setError("Failed to load restaurant details");
@@ -137,37 +144,39 @@ const RestaurantProfile = () => {
             <div>
               <p className="text-orange-100 text-sm">Rating</p>
               <p className="text-3xl font-bold">
-                ⭐ {restaurant.rating_avg || "N/A"}
+                ⭐ {restaurant.avg_rating ?? 0}
               </p>
               <p className="text-orange-100 text-sm">
-                ({restaurant.number_of_ratings || 0} reviews)
+                ({(restaurant.ratings || []).length} reviews)
               </p>
             </div>
 
-            {restaurant.restaurant_location && (
+            {restaurant.location && (
               <>
                 <div>
                   <p className="text-orange-100 text-sm">Location</p>
                   <p className="text-xl font-semibold">
-                    {restaurant.restaurant_location.city},{" "}
-                    {restaurant.restaurant_location.country}
+                    {restaurant.location.city || "-"},{" "}
+                    {restaurant.location.country || "-"}
                   </p>
                 </div>
 
-                {restaurant.restaurant_location.phone && (
+                {restaurant.location.phone_number && (
                   <div>
                     <p className="text-orange-100 text-sm">Phone</p>
                     <p className="text-xl font-semibold">
-                      {restaurant.restaurant_location.phone}
+                      {restaurant.location.phone_number}
                     </p>
                   </div>
                 )}
 
-                {restaurant.restaurant_location.hours && (
+                {(restaurant.location.hours_open ||
+                  restaurant.location.hours_close) && (
                   <div>
                     <p className="text-orange-100 text-sm">Hours</p>
                     <p className="text-xl font-semibold">
-                      {restaurant.restaurant_location.hours}
+                      {(restaurant.location.hours_open || "").toString()} -{" "}
+                      {(restaurant.location.hours_close || "").toString()}
                     </p>
                   </div>
                 )}
@@ -198,7 +207,7 @@ const RestaurantProfile = () => {
         {/* Details Tab */}
         {activeTab === "details" && (
           <div className="bg-white rounded-lg shadow-lg p-8 space-y-6">
-            {restaurant.restaurant_location && (
+            {restaurant.location && (
               <>
                 <div>
                   <h3 className="text-xl font-bold text-gray-900 mb-4">
@@ -208,20 +217,20 @@ const RestaurantProfile = () => {
                     <div>
                       <p className="text-gray-600 text-sm">City</p>
                       <p className="text-lg font-semibold">
-                        {restaurant.restaurant_location.city}
+                        {restaurant.location.city || "-"}
                       </p>
                     </div>
                     <div>
                       <p className="text-gray-600 text-sm">Country</p>
                       <p className="text-lg font-semibold">
-                        {restaurant.restaurant_location.country}
+                        {restaurant.location.country || "-"}
                       </p>
                     </div>
-                    {restaurant.restaurant_location.postal_code && (
+                    {restaurant.location.postal_code && (
                       <div>
                         <p className="text-gray-600 text-sm">Postal Code</p>
                         <p className="text-lg font-semibold">
-                          {restaurant.restaurant_location.postal_code}
+                          {restaurant.location.postal_code}
                         </p>
                       </div>
                     )}
@@ -233,32 +242,21 @@ const RestaurantProfile = () => {
                     📞 Contact Information
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {restaurant.restaurant_location.phone && (
+                    {restaurant.location.phone_number && (
                       <div>
                         <p className="text-gray-600 text-sm">Phone</p>
                         <p className="text-lg font-semibold">
-                          {restaurant.restaurant_location.phone}
+                          {restaurant.location.phone_number}
                         </p>
                       </div>
                     )}
-                    {restaurant.restaurant_location.website && (
-                      <div>
-                        <p className="text-gray-600 text-sm">Website</p>
-                        <a
-                          href={restaurant.restaurant_location.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-lg font-semibold text-blue-600 hover:text-blue-700"
-                        >
-                          Visit Website
-                        </a>
-                      </div>
-                    )}
-                    {restaurant.restaurant_location.hours && (
+                    {(restaurant.location.hours_open ||
+                      restaurant.location.hours_close) && (
                       <div className="md:col-span-2">
                         <p className="text-gray-600 text-sm">Hours</p>
                         <p className="text-lg font-semibold">
-                          {restaurant.restaurant_location.hours}
+                          {(restaurant.location.hours_open || "").toString()} -{" "}
+                          {(restaurant.location.hours_close || "").toString()}
                         </p>
                       </div>
                     )}
@@ -267,13 +265,13 @@ const RestaurantProfile = () => {
               </>
             )}
 
-            {restaurant.description && (
+            {restaurant.restaurant_description && (
               <div className="border-t pt-6">
                 <h3 className="text-xl font-bold text-gray-900 mb-4">
                   About
                 </h3>
                 <p className="text-gray-700 leading-relaxed">
-                  {restaurant.description}
+                  {restaurant.restaurant_description}
                 </p>
               </div>
             )}

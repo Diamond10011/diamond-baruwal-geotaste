@@ -64,6 +64,15 @@ const RecipeDetail = () => {
       return;
     }
 
+    // Check if ID looks valid (UUID format)
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      setError("Recipe not found. Invalid recipe ID.");
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await axios.get(`${API_BASE_URL}/recipes/${id}/`, {
@@ -73,7 +82,11 @@ const RecipeDetail = () => {
       setError(null);
     } catch (err) {
       console.error("Recipe detail error:", err);
-      setError("Failed to load recipe details. Please try again.");
+      if (err.response?.status === 404) {
+        setError("Recipe not found. This recipe may have been deleted.");
+      } else {
+        setError("Failed to load recipe details. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -480,15 +493,15 @@ const RecipeDetail = () => {
                 {recipe.difficulty}
               </span>
               <div className="flex flex-wrap gap-2">
-                  {recipe.dietary_tags.split(",").map((tag, idx) => (
-                    <span
-                      key={idx}
-                      className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-100 flex items-center gap-1"
-                    >
-                      {tag.trim()}
-                    </span>
-                  ))}
-                </div>
+                {recipe.dietary_tags.split(",").map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="px-3 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-100 flex items-center gap-1"
+                  >
+                    {tag.trim()}
+                  </span>
+                ))}
+              </div>
             </div>
 
             <h1 className="text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight mb-4">
@@ -615,39 +628,47 @@ const RecipeDetail = () => {
 
             {/* Ingredients & Instructions Split (on large screens) */}
             <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-               {/* Tab-like background for the Ingredients section */}
-               <div className="flex flex-col md:flex-row">
-                  <div className="md:w-1/3 bg-slate-50/50 p-10 border-r border-slate-100">
-                    <h2 className="text-2xl font-black text-slate-900 mb-8">Ingredients</h2>
-                    <ul className="space-y-4">
-                      {recipe.ingredients.split("\n").map((ing, idx) => (
-                        <li key={idx} className="flex items-start gap-3 group">
-                          {/* <div className="mt-1 w-5 h-5 rounded-md border-2 border-indigo-200 flex-shrink-0 group-hover:border-indigo-500 transition-colors" /> */}
-                          <span className="pl-1 w-6 h-6 rounded-md border-2 border-indigo-200 flex-shrink-0 group-hover:border-indigo-500 transition-colors">
-                              {idx + 1}
-                            </span>
-                          <span className="text-slate-600 font-medium leading-tight">{ing}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  
-                  <div className="md:w-2/3 p-10">
-                    <h2 className="text-2xl font-black text-slate-900 mb-8">Preparation Steps</h2>
-                    <div className="space-y-10">
-                      {recipe.instructions.split("\n").map((step, idx) => (
-                        <div key={idx} className="relative flex gap-6">
-                          <div className="flex-shrink-0">
-                            <span className="flex w-10 h-10 rounded-2xl bg-indigo-600 text-white font-black items-center justify-center shadow-lg shadow-indigo-100">
-                              {idx + 1}
-                            </span>
-                          </div>
-                          <p className="text-slate-700 text-lg leading-relaxed pt-1 font-medium">{step}</p>
+              {/* Tab-like background for the Ingredients section */}
+              <div className="flex flex-col md:flex-row">
+                <div className="md:w-1/3 bg-slate-50/50 p-10 border-r border-slate-100">
+                  <h2 className="text-2xl font-black text-slate-900 mb-8">
+                    Ingredients
+                  </h2>
+                  <ul className="space-y-4">
+                    {recipe.ingredients.split("\n").map((ing, idx) => (
+                      <li key={idx} className="flex items-start gap-3 group">
+                        {/* <div className="mt-1 w-5 h-5 rounded-md border-2 border-indigo-200 flex-shrink-0 group-hover:border-indigo-500 transition-colors" /> */}
+                        <span className="pl-1 w-6 h-6 rounded-md border-2 border-indigo-200 flex-shrink-0 group-hover:border-indigo-500 transition-colors">
+                          {idx + 1}
+                        </span>
+                        <span className="text-slate-600 font-medium leading-tight">
+                          {ing}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="md:w-2/3 p-10">
+                  <h2 className="text-2xl font-black text-slate-900 mb-8">
+                    Preparation Steps
+                  </h2>
+                  <div className="space-y-10">
+                    {recipe.instructions.split("\n").map((step, idx) => (
+                      <div key={idx} className="relative flex gap-6">
+                        <div className="flex-shrink-0">
+                          <span className="flex w-10 h-10 rounded-2xl bg-indigo-600 text-white font-black items-center justify-center shadow-lg shadow-indigo-100">
+                            {idx + 1}
+                          </span>
                         </div>
-                      ))}
-                    </div>
+                        <p className="text-slate-700 text-lg leading-relaxed pt-1 font-medium">
+                          {step}
+                        </p>
+                      </div>
+                    ))}
                   </div>
-               </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -815,8 +836,6 @@ const RecipeDetail = () => {
                 </div>
               </div>
             )}
-
-          
           </div>
         </div>
       </div>

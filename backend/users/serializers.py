@@ -566,7 +566,7 @@ class RestaurantDetailSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
             rating = obj.ratings.filter(user=request.user).first()
-            return RecipeRatingSerializer(rating).data if rating else None
+            return RestaurantRatingSerializer(rating).data if rating else None
         return None
 
 
