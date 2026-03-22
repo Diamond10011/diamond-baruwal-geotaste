@@ -1316,7 +1316,7 @@ def remove_favorite_recipe(request, recipe_id):
 @permission_classes([AllowAny])
 def restaurant_list(request):
     """Get all restaurants with locations"""
-    restaurants = RestaurantUserProfile.objects.all().prefetch_related('location')
+    restaurants = RestaurantUserProfile.objects.all().select_related('location')
     serializer = RestaurantListSerializer(restaurants, many=True)
     return Response({
         'count': restaurants.count(),
@@ -1338,10 +1338,9 @@ def restaurant_detail(request, restaurant_id):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def restaurant_nearby(request):
     """Find nearby restaurants based on latitude, longitude and radius"""
-    from decimal import Decimal
     import math
     
     serializer = NearbyRestaurantSerializer(data=request.data)
@@ -1354,12 +1353,16 @@ def restaurant_nearby(request):
         # Get all restaurants with locations
         restaurants = RestaurantUserProfile.objects.filter(
             is_verified=True
-        ).prefetch_related('location').exclude(location__isnull=True)
+        ).select_related('location').exclude(location__isnull=True).exclude(
+            location__latitude__isnull=True
+        ).exclude(
+            location__longitude__isnull=True
+        )
         
         # Filter by radius using Haversine formula
         nearby = []
         for restaurant in restaurants:
-            if not restaurant.location:
+            if not restaurant.location or restaurant.location.latitude is None or restaurant.location.longitude is None:
                 continue
             
             rest_lat = float(restaurant.location.latitude)
@@ -1374,8 +1377,10 @@ def restaurant_nearby(request):
             distance = R * c
             
             if distance <= radius:
-                if cuisine and cuisine.lower() not in restaurant.cuisine_type.lower():
+                restaurant_cuisine = (restaurant.cuisine_type or "").lower()
+                if cuisine and cuisine.lower() not in restaurant_cuisine:
                     continue
+                restaurant.distance_km = distance
                 nearby.append(restaurant)
         
         serializer = RestaurantListSerializer(nearby, many=True)

@@ -490,7 +490,7 @@ const Recommendations = () => {
         )}
 
         {/* Favorite Cuisines Section */}
-        {recommendations.user_favorite_cuisines.length > 0 && (
+        {/* {recommendations.user_favorite_cuisines.length > 0 && (
           <div className="mt-12 bg-white rounded-2xl shadow-lg p-8 border border-orange-100">
             <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center gap-2">
               🎯 Your Favorite Cuisines
@@ -506,7 +506,7 @@ const Recommendations = () => {
               ))}
             </div>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );

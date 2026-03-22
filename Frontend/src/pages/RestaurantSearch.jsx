@@ -14,6 +14,7 @@ const RestaurantSearch = () => {
     removeRestaurantFromFavorites,
     isFavoriteRestaurant,
     addRestaurantSearch,
+    searchHistory,
   } = useAuth();
   const navigate = useNavigate();
   const [restaurants, setRestaurants] = useState([]);
@@ -32,6 +33,11 @@ const RestaurantSearch = () => {
 
   const token = localStorage.getItem("access_token");
 
+  const roundCoord = (value) => {
+    if (typeof value !== "number" || Number.isNaN(value)) return value;
+    return Number(value.toFixed(6));
+  };
+
   // Get user's location
   const handleGetLocation = () => {
     setLoading(true);
@@ -40,14 +46,16 @@ const RestaurantSearch = () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        setUserLocation({ latitude, longitude });
+        const roundedLatitude = roundCoord(latitude);
+        const roundedLongitude = roundCoord(longitude);
+        setUserLocation({ latitude: roundedLatitude, longitude: roundedLongitude });
         setSearchParams((prev) => ({
           ...prev,
-          latitude,
-          longitude,
+          latitude: roundedLatitude,
+          longitude: roundedLongitude,
         }));
         setUseLocation(true);
-        searchNearbyRestaurants(latitude, longitude);
+        searchNearbyRestaurants(roundedLatitude, roundedLongitude);
       },
       (err) => {
         setError(
@@ -59,20 +67,22 @@ const RestaurantSearch = () => {
   };
 
   // Search for nearby restaurants
-  const searchNearbyRestaurants = async (lat, lng) => {
+  const searchNearbyRestaurants = async (lat, lng, nextCuisineType) => {
     try {
       setLoading(true);
+      const cuisineType =
+        typeof nextCuisineType === "string"
+          ? nextCuisineType
+          : searchParams.cuisineType;
       const response = await axios.post(
         `${API_BASE_URL}/restaurants/nearby/`,
         {
-          latitude: lat,
-          longitude: lng,
+          latitude: roundCoord(lat),
+          longitude: roundCoord(lng),
           radius: searchParams.radius,
-          cuisine_type: searchParams.cuisineType || undefined,
+          cuisine_type: cuisineType || undefined,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
       );
 
       setRestaurants(response.data.restaurants || []);
@@ -81,6 +91,7 @@ const RestaurantSearch = () => {
     } catch (err) {
       setError("Failed to load nearby restaurants");
       setRestaurants([]);
+      console.error("Nearby restaurants error:", err?.response?.data || err);
     } finally {
       setLoading(false);
     }
@@ -90,9 +101,10 @@ const RestaurantSearch = () => {
   const loadAllRestaurants = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/restaurants/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        `${API_BASE_URL}/restaurants/`,
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+      );
 
       setRestaurants(response.data.restaurants || []);
       setFilteredRestaurants(response.data.restaurants || []);
@@ -114,7 +126,7 @@ const RestaurantSearch = () => {
     }));
 
     if (useLocation && searchParams.latitude && searchParams.longitude) {
-      searchNearbyRestaurants(searchParams.latitude, searchParams.longitude);
+      searchNearbyRestaurants(searchParams.latitude, searchParams.longitude, cuisine);
     } else {
       let filtered = restaurants;
       if (cuisine) {
@@ -179,16 +191,17 @@ const RestaurantSearch = () => {
   }, []);
 
   const cuisineTypes = [
+    "Nepali",
+    "Indian",
+    "Thai",
     "Italian",
     "Chinese",
-    "Indian",
-    "Mexican",
     "Japanese",
-    "Thai",
+    "Mexican",
     "French",
     "American",
     "Pakistani",
-    "Turkish",
+    
   ];
 
   return (
@@ -202,6 +215,15 @@ const RestaurantSearch = () => {
           <p className="text-lg text-gray-600">
             Discover amazing restaurants near you or browse all available
             restaurants
+          </p>
+        </div>
+        {/* Map Info */}
+        <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6 mt-12">
+          <p className="text-gray-700">
+            <strong>💡 Tip:</strong> Click "Use My Location" to find restaurants
+            near you. Adjust the search radius slider to find restaurants within
+            your desired distance. Filter by cuisine type to narrow down your
+            search.
           </p>
         </div>
 
@@ -292,14 +314,13 @@ const RestaurantSearch = () => {
                   </button>
                 ))}
               </div>
-              {favorites.searchHistory?.restaurants &&
-                favorites.searchHistory.restaurants.length > 0 && (
+              {searchHistory?.restaurants && searchHistory.restaurants.length > 0 && (
                   <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
                     <p className="text-xs font-semibold text-gray-600 mb-2">
                       Recent Searches:
                     </p>
                     <div className="space-y-1">
-                      {favorites.searchHistory.restaurants
+                      {searchHistory.restaurants
                         .slice(0, 10)
                         .map((item, idx) => (
                           <button
@@ -395,42 +416,45 @@ const RestaurantSearch = () => {
                     </div>
 
                     {/* Location */}
-                    {restaurant.restaurant_location && (
+                    {(restaurant.location || restaurant.restaurant_location) && (
                       <div className="text-sm text-gray-700">
                         <p className="font-semibold mb-1">📍 Location</p>
                         <p>
-                          {restaurant.restaurant_location.city},{" "}
-                          {restaurant.restaurant_location.country}
+                          {(restaurant.location || restaurant.restaurant_location).city},{" "}
+                          {(restaurant.location || restaurant.restaurant_location).country}
                         </p>
-                        {restaurant.restaurant_location.postal_code && (
+                        {(restaurant.location || restaurant.restaurant_location).postal_code && (
                           <p className="text-gray-600">
-                            {restaurant.restaurant_location.postal_code}
+                            {(restaurant.location || restaurant.restaurant_location).postal_code}
                           </p>
                         )}
                       </div>
                     )}
 
                     {/* Distance (if using location) */}
-                    {useLocation && restaurant.distance_km !== undefined && (
+                    {useLocation && typeof restaurant.distance_km === "number" && (
                       <div className="text-sm font-semibold text-orange-600">
                         📏 {restaurant.distance_km.toFixed(2)} km away
                       </div>
                     )}
 
                     {/* Contact */}
-                    {restaurant.restaurant_location?.phone && (
+                    {(restaurant.location || restaurant.restaurant_location)?.phone_number && (
                       <div className="text-sm text-gray-700">
                         <p className="font-semibold">
-                          📞 {restaurant.restaurant_location.phone}
+                          📞 {(restaurant.location || restaurant.restaurant_location).phone_number}
                         </p>
                       </div>
                     )}
 
                     {/* Hours */}
-                    {restaurant.restaurant_location?.hours && (
+                    {((restaurant.location || restaurant.restaurant_location)?.hours_open ||
+                      (restaurant.location || restaurant.restaurant_location)?.hours_close) && (
                       <div className="text-sm text-gray-700">
                         <p className="font-semibold">🕐 Hours</p>
-                        <p>{restaurant.restaurant_location.hours}</p>
+                        <p>
+                          {`${(restaurant.location || restaurant.restaurant_location).hours_open ?? "—"} - ${(restaurant.location || restaurant.restaurant_location).hours_close ?? "—"}`}
+                        </p>
                       </div>
                     )}
 
@@ -464,15 +488,7 @@ const RestaurantSearch = () => {
           )}
         </div>
 
-        {/* Map Info */}
-        <div className="bg-blue-50 border-l-4 border-blue-500 rounded-lg p-6 mt-12">
-          <p className="text-gray-700">
-            <strong>💡 Tip:</strong> Click "Use My Location" to find restaurants
-            near you. Adjust the search radius slider to find restaurants within
-            your desired distance. Filter by cuisine type to narrow down your
-            search.
-          </p>
-        </div>
+        
       </div>
     </div>
   );

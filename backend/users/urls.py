@@ -58,8 +58,12 @@ urlpatterns = [
     # ==================== ADMIN MANAGEMENT ====================
     path('admin/summary/', admin_summary, name='admin_summary'),
     path('admin/users/', admin_users, name='admin_users'),
+    # Accept both with/without trailing slash for non-GET requests (e.g. DELETE),
+    # because Django's APPEND_SLASH does not reliably redirect unsafe methods.
     path('admin/users/<str:user_id>/', admin_user_detail, name='admin_user_detail'),
+    path('admin/users/<str:user_id>', admin_user_detail, name='admin_user_detail_noslash'),
     path('admin/users/<str:user_id>/reset-password/', admin_user_reset_password, name='admin_user_reset_password'),
+    path('admin/users/<str:user_id>/reset-password', admin_user_reset_password, name='admin_user_reset_password_noslash'),
     path('admin/recipes/', admin_recipes, name='admin_recipes'),
     path('admin/recipes/<str:recipe_id>/delete/', admin_recipe_delete, name='admin_recipe_delete'),
     path('admin/restaurants/', admin_restaurants, name='admin_restaurants'),
@@ -82,8 +86,8 @@ urlpatterns = [
     
     # ==================== RESTAURANTS ====================
     path('restaurants/', restaurant_list, name='restaurant_list'),
-    path('restaurants/<str:restaurant_id>/', restaurant_detail, name='restaurant_detail'),
     path('restaurants/nearby/', restaurant_nearby, name='restaurant_nearby'),
+    path('restaurants/<str:restaurant_id>/', restaurant_detail, name='restaurant_detail'),
     path('restaurants/<str:restaurant_id>/menu/', restaurant_menu, name='restaurant_menu'),
     path('restaurants/<str:restaurant_id>/rating/', restaurant_rating, name='restaurant_rating'),
     path('restaurant-location/', restaurant_location, name='restaurant_location'),

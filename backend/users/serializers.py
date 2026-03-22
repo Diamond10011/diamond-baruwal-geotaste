@@ -575,12 +575,13 @@ class RestaurantListSerializer(serializers.ModelSerializer):
     """Serializer for restaurant list view"""
     location = RestaurantLocationSerializer(read_only=True)
     rating_avg = serializers.SerializerMethodField()
+    distance_km = serializers.SerializerMethodField()
     
     class Meta:
         model = RestaurantUserProfile
         fields = [
             'id', 'restaurant_name', 'restaurant_description', 'cuisine_type',
-            'is_verified', 'location', 'rating_avg', 'created_at'
+            'is_verified', 'location', 'rating_avg', 'distance_km', 'created_at'
         ]
     
     def get_rating_avg(self, obj):
@@ -590,12 +591,26 @@ class RestaurantListSerializer(serializers.ModelSerializer):
             return round(total / ratings.count(), 2)
         return 0
 
+    def get_distance_km(self, obj):
+        distance = getattr(obj, "distance_km", None)
+        if distance is None:
+            return None
+        try:
+            return round(float(distance), 2)
+        except (TypeError, ValueError):
+            return None
+
 
 class NearbyRestaurantSerializer(serializers.Serializer):
     """Serializer for nearby restaurant search query"""
-    latitude = serializers.DecimalField(max_digits=9, decimal_places=6)
-    longitude = serializers.DecimalField(max_digits=9, decimal_places=6)
-    radius = serializers.IntegerField(default=10, help_text="Radius in kilometers")
+    latitude = serializers.FloatField(min_value=-90.0, max_value=90.0)
+    longitude = serializers.FloatField(min_value=-180.0, max_value=180.0)
+    radius = serializers.IntegerField(
+        default=10,
+        min_value=1,
+        max_value=200,
+        help_text="Radius in kilometers",
+    )
     cuisine_type = serializers.CharField(required=False, allow_blank=True)
 
 
