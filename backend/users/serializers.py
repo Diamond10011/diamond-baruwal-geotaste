@@ -99,7 +99,7 @@ class RegisterSerializer(serializers.ModelSerializer):
             email=validated_data['email'],
             role=validated_data['role'],
             username=validated_data['email'],
-            is_email_verified=True
+            is_email_verified=False
         )
         user.set_password(password)
         user.save()

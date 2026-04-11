@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
 import { Alert } from "../components/FormComponents";
 
 const API_BASE_URL = "http://localhost:8000/api";
 
 const Stores = () => {
-  const navigate = useNavigate();
   const token = localStorage.getItem("access_token");
 
   const [stores, setStores] = useState([]);
@@ -115,16 +113,6 @@ const Stores = () => {
                     {s.store_description || "No description provided yet."}
                   </p>
 
-                  <div className="mt-6 flex gap-2">
-                    <button
-                      onClick={() =>
-                        navigate("/orders", { state: { storeId: s.id } })
-                      }
-                      className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-extrabold hover:shadow-lg transition"
-                    >
-                      Shop Products
-                    </button>
-                  </div>
                 </div>
               </div>
             ))}
@@ -136,4 +124,3 @@ const Stores = () => {
 };
 
 export default Stores;
-

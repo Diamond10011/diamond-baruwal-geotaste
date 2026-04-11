@@ -27,7 +27,6 @@ import Recommendations from "./pages/Recommendations";
 import RestaurantSearch from "./pages/RestaurantSearch";
 import RestaurantProfile from "./pages/RestaurantProfile";
 import Stores from "./pages/Stores";
-import Orders from "./pages/Orders";
 import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
 
@@ -144,7 +143,6 @@ export default function App() {
             <Route path="/restaurants/:id" element={<RestaurantProfile />} />
             {/* Store Routes (for normal/customer users) */}
             <Route path="/stores" element={<Stores />} />
-            <Route path="/orders" element={<Orders />} />
           </Route>
 
           {/* Catch all - show 404 page */}

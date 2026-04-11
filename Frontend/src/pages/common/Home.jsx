@@ -270,18 +270,6 @@ const Home = () => {
             </Link>
           )}
 
-          {/* My Orders (Normal/Customer users) */}
-          {(user?.role === "normal" || user?.role === "customer") && (
-            <Link
-              to="/orders"
-              className="bg-white rounded-lg shadow-md hover:shadow-lg p-6 text-center transition-shadow border-l-4 border-green-500"
-            >
-              <div className="text-4xl mb-2">📦</div>
-              <h3 className="font-semibold text-gray-900">My Orders</h3>
-              <p className="text-sm text-gray-600">Track your orders</p>
-            </Link>
-          )}
-
           {/* My Store (Store & Admin only) */}
           {(user?.role === "store" || user?.role === "admin") && (
             <Link

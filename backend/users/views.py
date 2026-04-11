@@ -47,7 +47,7 @@ def register(request):
         user = serializer.save()
         return Response({
             'message': 'User registered successfully. You can now login.',
-            'user': UserSerializer(user).data,
+            'user': UserSerializer(user, context={'request': request}).data,
             'email_verification_required': False
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -67,7 +67,7 @@ def login(request):
         refresh = RefreshToken.for_user(user)
         return Response({
             'message': 'Login successful',
-            'user': UserSerializer(user).data,
+            'user': UserSerializer(user, context={'request': request}).data,
             'tokens': {
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
@@ -108,7 +108,7 @@ def verify_email(request):
         
         return Response({
             'message': 'Email verified successfully. You can now login.',
-            'user': UserSerializer(user).data
+            'user': UserSerializer(user, context={'request': request}).data
         }, status=status.HTTP_200_OK)
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -247,7 +247,7 @@ def get_current_user(request):
     """
     user = request.user
     return Response({
-        'user': UserSerializer(user).data
+        'user': UserSerializer(user, context={'request': request}).data
     }, status=status.HTTP_200_OK)
 
 
@@ -261,11 +261,16 @@ def user_profile(request):
     profile, created = UserProfile.objects.get_or_create(user=user)
     
     if request.method == 'GET':
-        serializer = UserProfileSerializer(profile)
+        serializer = UserProfileSerializer(profile, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     elif request.method == 'PUT':
-        serializer = UserProfileSerializer(profile, data=request.data, partial=True)
+        serializer = UserProfileSerializer(
+            profile,
+            data=request.data,
+            partial=True,
+            context={'request': request},
+        )
         if serializer.is_valid():
             serializer.save()
             return Response({
@@ -296,11 +301,11 @@ def store_profile(request):
         store_profile = None
     
     if request.method == 'GET':
-        serializer = StoreUserProfileSerializer(store_profile)
+        serializer = StoreUserProfileSerializer(store_profile, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     elif request.method == 'PUT':
-        kwargs = {'data': request.data, 'partial': True}
+        kwargs = {'data': request.data, 'partial': True, 'context': {'request': request}}
         if store_profile:
             serializer = StoreUserProfileSerializer(store_profile, **kwargs)
         else:
@@ -336,11 +341,14 @@ def restaurant_profile(request):
         restaurant_profile = None
     
     if request.method == 'GET':
-        serializer = RestaurantUserProfileSerializer(restaurant_profile)
+        serializer = RestaurantUserProfileSerializer(
+            restaurant_profile,
+            context={'request': request},
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     elif request.method == 'PUT':
-        kwargs = {'data': request.data, 'partial': True}
+        kwargs = {'data': request.data, 'partial': True, 'context': {'request': request}}
         if restaurant_profile:
             serializer = RestaurantUserProfileSerializer(restaurant_profile, **kwargs)
         else:
@@ -675,13 +683,10 @@ def admin_user_detail(request, user_id):
     # PUT
     data = request.data or {}
     role = data.get("role")
+    # Profile creation is now manual for the user. Admin only updates the role.
+    pass
     if role and role in dict(CustomUser.ROLE_CHOICES):
         u.role = role
-        # Ensure role-specific profile exists if needed.
-        if role == "store":
-            StoreUserProfile.objects.get_or_create(user=u, defaults={"store_name": "", "store_address": ""})
-        if role == "restaurant":
-            RestaurantUserProfile.objects.get_or_create(user=u, defaults={"restaurant_name": "", "restaurant_address": ""})
     if "is_email_verified" in data:
         u.is_email_verified = bool(data.get("is_email_verified"))
     if "is_active" in data:

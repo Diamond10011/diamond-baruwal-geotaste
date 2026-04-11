@@ -37,8 +37,6 @@ const StoreProfile = () => {
   const [productForm, setProductForm] = useState(emptyProduct);
   const [editingProductId, setEditingProductId] = useState(null);
 
-  const [orders, setOrders] = useState([]);
-
   const authHeaders = token
     ? { Authorization: `Bearer ${token}` }
     : undefined;
@@ -52,7 +50,7 @@ const StoreProfile = () => {
     try {
       setLoading(true);
       setError("");
-      await Promise.all([loadStoreProfile(), loadProducts(), loadOrders()]);
+      await Promise.all([loadStoreProfile(), loadProducts()]);
     } finally {
       setLoading(false);
     }
@@ -191,22 +189,6 @@ const StoreProfile = () => {
     }
   };
 
-  const loadOrders = async () => {
-    const response = await axios.get(`${API_BASE_URL}/orders/`, {
-      headers: authHeaders,
-    });
-    setOrders(response.data.orders || []);
-  };
-
-  const statusPill = (status) => {
-    const s = (status || "").toLowerCase();
-    if (s === "paid" || s === "completed") return "bg-green-100 text-green-700";
-    if (s === "payment_pending") return "bg-orange-100 text-orange-700";
-    if (s === "processing") return "bg-purple-100 text-purple-700";
-    if (s === "cancelled") return "bg-red-100 text-red-700";
-    return "bg-gray-100 text-gray-700";
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -247,7 +229,6 @@ const StoreProfile = () => {
           {[
             { id: "store", label: "Store Profile" },
             { id: "products", label: "Products" },
-            { id: "orders", label: "Orders" },
           ].map((t) => (
             <button
               key={t.id}
@@ -516,97 +497,6 @@ const StoreProfile = () => {
           </div>
         )}
 
-        {activeTab === "orders" && (
-          <div className="bg-white rounded-2xl shadow-lg p-8 border border-indigo-50">
-            <div className="flex items-center justify-between gap-4 mb-6">
-              <h2 className="text-2xl font-extrabold text-gray-900">
-                Orders ({orders.length})
-              </h2>
-              <button
-                onClick={loadOrders}
-                disabled={saving}
-                className="px-4 py-2 rounded-xl border-2 border-gray-200 text-gray-700 font-bold hover:bg-gray-50 transition disabled:opacity-50"
-              >
-                Refresh Orders
-              </button>
-            </div>
-
-            {orders.length === 0 ? (
-              <div className="text-center py-12 text-gray-600">
-                No orders yet.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {orders.map((o) => (
-                  <div
-                    key={o.id}
-                    className="rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm text-gray-600 font-semibold">
-                          Order ID
-                        </p>
-                        <p className="font-extrabold text-gray-900">
-                          {o.order_id}
-                        </p>
-                      </div>
-                      <span
-                        className={`px-4 py-2 rounded-full text-xs font-extrabold ${statusPill(
-                          o.status,
-                        )}`}
-                      >
-                        {(o.status || "pending").toUpperCase()}
-                      </span>
-                      <div className="text-right">
-                        <p className="text-sm text-gray-600 font-semibold">
-                          Total
-                        </p>
-                        <p className="text-xl font-extrabold text-indigo-700">
-                          Rs. {o.total_amount}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="text-sm text-gray-700">
-                        <span className="font-bold">Customer:</span>{" "}
-                        {o.customer_email || "Unknown"}
-                      </div>
-                      <div className="text-sm text-gray-700">
-                        <span className="font-bold">Delivery:</span>{" "}
-                        {o.delivery_address || "Not provided"}
-                      </div>
-                    </div>
-
-                    {o.items?.length > 0 && (
-                      <div className="mt-4 border-t pt-4">
-                        <p className="font-extrabold text-gray-900 mb-3">
-                          Items
-                        </p>
-                        <div className="space-y-2">
-                          {o.items.map((it) => (
-                            <div
-                              key={it.id}
-                              className="flex items-center justify-between text-sm"
-                            >
-                              <span className="font-semibold text-gray-800">
-                                {it.product_name} x {it.quantity}
-                              </span>
-                              <span className="font-bold text-gray-700">
-                                Rs. {it.subtotal}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
