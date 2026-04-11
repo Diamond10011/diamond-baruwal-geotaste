@@ -33,6 +33,7 @@ GeoTaste Team
         send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
     except Exception as e:
         print(f"Error sending verification email: {e}")
+        raise
 
 def send_password_reset_email(email, otp_code):
     """Send password reset OTP email"""
@@ -55,6 +56,7 @@ GeoTaste Team
         send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
     except Exception as e:
         print(f"Error sending password reset email: {e}")
+        raise
 
 # ============================================================================
 # SERIALIZERS
@@ -105,11 +107,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Create user profile for all users
         UserProfile.objects.create(user=user)
         
-        # Create role-specific profile
-        if user.role == 'store':
-            StoreUserProfile.objects.create(user=user, store_name='', store_address='')
-        elif user.role == 'restaurant':
-            RestaurantUserProfile.objects.create(user=user, restaurant_name='', restaurant_address='')
+        # Store and Restaurant profiles are no longer auto-created here.
+        # They must be created manually by the user via the profile endpoints.
         
         return user
 
@@ -323,10 +322,6 @@ class RestaurantUserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'user_email', 'is_verified', 'created_at', 'updated_at']
 
 
-# ============================================================================
-# RECIPE SERIALIZERS
-# ============================================================================
-
 class RecipeRatingSerializer(serializers.ModelSerializer):
     """Serializer for recipe ratings and reviews"""
     user_email = serializers.CharField(source='user.email', read_only=True)
@@ -527,6 +522,29 @@ class RestaurantLocationSerializer(serializers.ModelSerializer):
             'is_open', 'rating_avg', 'total_ratings', 'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'rating_avg', 'total_ratings', 'created_at', 'updated_at']
+    
+    def validate(self, data):
+        """Validate and parse coordinates, handling edge cases like combined lat/lon strings"""
+        from decimal import Decimal
+        
+        # If both lat and lon are provided as strings (e.g., "26.658390, 87.322953" in one field),
+        # try to parse them
+        lat = data.get('latitude')
+        lon = data.get('longitude')
+        
+        # Handle case where coordinates might be in a combined string like "26.658390, 87.322953"
+        if lat and isinstance(lat, str) and ',' in lat and not lon:
+            try:
+                parts = [p.strip() for p in lat.split(',')]
+                if len(parts) == 2:
+                    data['latitude'] = Decimal(parts[0])
+                    data['longitude'] = Decimal(parts[1])
+            except (ValueError, TypeError):
+                raise serializers.ValidationError(
+                    "If providing combined coordinates, use format: 'latitude,longitude'"
+                )
+        
+        return data
 
 
 class RestaurantRatingSerializer(serializers.ModelSerializer):
@@ -631,9 +649,7 @@ class StoreProductSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
-# ============================================================================
-# ORDER & PAYMENT SERIALIZERS
-# ============================================================================
+
 
 class OrderItemSerializer(serializers.ModelSerializer):
     """Serializer for order items"""

@@ -16,7 +16,7 @@ const Stores = () => {
 
   useEffect(() => {
     fetchStores();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, []);
 
   const fetchStores = async () => {

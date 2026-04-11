@@ -48,14 +48,14 @@ INSTALLED_APPS = [
     'users',
 ]
 
-# Email Configuration (SMTP)
+# Email Configuration (SMTP - Production)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'diabishek123@gmail.com')  # Set via environment variable
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '1245')  # Set via environment variable
-DEFAULT_FROM_EMAIL = 'noreply@geotaste.com'
+EMAIL_HOST_USER = 'diabishek123@gmail.com'
+EMAIL_HOST_PASSWORD = 'vkbd vrbe jnzt vnoc' 
+DEFAULT_FROM_EMAIL = 'diabishek123@gmail.com'   
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -160,9 +160,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type

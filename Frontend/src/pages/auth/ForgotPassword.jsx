@@ -199,7 +199,7 @@ const ForgotPassword = () => {
 
         {/* Error Alert */}
         {error && (
-          <Alert message={error} type="error" onClose={() => setError("")} />
+          <Alert message={error} type="error" />
         )}
 
         {/* STEP 1: EMAIL */}

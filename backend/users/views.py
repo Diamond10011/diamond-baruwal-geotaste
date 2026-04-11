@@ -288,19 +288,26 @@ def store_profile(request):
             'error': 'Only store users can access this endpoint'
         }, status=status.HTTP_403_FORBIDDEN)
     
-    store_profile, created = StoreUserProfile.objects.get_or_create(
-        user=user,
-        defaults={'store_name': '', 'store_address': ''}
-    )
+    try:
+        store_profile = StoreUserProfile.objects.get(user=user)
+    except StoreUserProfile.DoesNotExist:
+        if request.method == 'GET':
+            return Response({'error': 'Store profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        store_profile = None
     
     if request.method == 'GET':
         serializer = StoreUserProfileSerializer(store_profile)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     elif request.method == 'PUT':
-        serializer = StoreUserProfileSerializer(store_profile, data=request.data, partial=True)
+        kwargs = {'data': request.data, 'partial': True}
+        if store_profile:
+            serializer = StoreUserProfileSerializer(store_profile, **kwargs)
+        else:
+            serializer = StoreUserProfileSerializer(**kwargs)
+            
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(user=user)
             return Response({
                 'message': 'Store profile updated successfully',
                 'profile': serializer.data
@@ -321,19 +328,26 @@ def restaurant_profile(request):
             'error': 'Only restaurant users can access this endpoint'
         }, status=status.HTTP_403_FORBIDDEN)
     
-    restaurant_profile, created = RestaurantUserProfile.objects.get_or_create(
-        user=user,
-        defaults={'restaurant_name': '', 'restaurant_address': ''}
-    )
+    try:
+        restaurant_profile = RestaurantUserProfile.objects.get(user=user)
+    except RestaurantUserProfile.DoesNotExist:
+        if request.method == 'GET':
+            return Response({'error': 'Restaurant profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        restaurant_profile = None
     
     if request.method == 'GET':
         serializer = RestaurantUserProfileSerializer(restaurant_profile)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
     elif request.method == 'PUT':
-        serializer = RestaurantUserProfileSerializer(restaurant_profile, data=request.data, partial=True)
+        kwargs = {'data': request.data, 'partial': True}
+        if restaurant_profile:
+            serializer = RestaurantUserProfileSerializer(restaurant_profile, **kwargs)
+        else:
+            serializer = RestaurantUserProfileSerializer(**kwargs)
+            
         if serializer.is_valid():
-            serializer.save()
+            serializer.save(user=user)
             return Response({
                 'message': 'Restaurant profile updated successfully',
                 'profile': serializer.data
@@ -1351,9 +1365,9 @@ def restaurant_nearby(request):
         cuisine = serializer.validated_data.get('cuisine_type', '').strip()
         
         # Get all restaurants with locations
-        restaurants = RestaurantUserProfile.objects.filter(
-            is_verified=True
-        ).select_related('location').exclude(location__isnull=True).exclude(
+        restaurants = RestaurantUserProfile.objects.select_related('location').exclude(
+            location__isnull=True
+        ).exclude(
             location__latitude__isnull=True
         ).exclude(
             location__longitude__isnull=True

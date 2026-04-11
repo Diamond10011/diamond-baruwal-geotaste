@@ -7,10 +7,10 @@ const ProtectedRoute = ({
   requiredRole = null,
   allowedRoles = null,
 }) => {
-  const { isAuthenticated, user, loading } = useAuth();
+  const { isAuthenticated, user, isInitializing } = useAuth();
 
   // Show loading state while checking authentication
-  if (loading) {
+  if (isInitializing) {
     return (
       <div className="flex items-center justify-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

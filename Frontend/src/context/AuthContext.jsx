@@ -17,7 +17,8 @@ const AuthProvider = ({ children }) => {
   // ============================================================================
   const [user, setUser] = useState(null);
   const [tokens, setTokens] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [profile, setProfile] = useState(null);
@@ -46,7 +47,7 @@ const AuthProvider = ({ children }) => {
       });
       fetchCurrentUser(token);
     } else {
-      setLoading(false);
+      setIsInitializing(false);
     }
   }, []);
 
@@ -62,7 +63,7 @@ const AuthProvider = ({ children }) => {
       localStorage.removeItem("refresh_token");
       setIsAuthenticated(false);
     } finally {
-      setLoading(false);
+      setIsInitializing(false);
     }
   }, []);
 
@@ -286,11 +287,16 @@ const AuthProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       try {
+        const isFormData =
+          typeof FormData !== "undefined" && profileData instanceof FormData;
+        const isBlob =
+          typeof Blob !== "undefined" && photoFile instanceof Blob;
+
         let data = profileData;
         let headers = { Authorization: `Bearer ${tokens.access}` };
 
-        // If there's a file, use FormData
-        if (photoFile) {
+        // If there's a file, use FormData (unless the caller already provided FormData)
+        if (!isFormData && isBlob) {
           const formData = new FormData();
           formData.append("first_name", profileData.first_name);
           formData.append("last_name", profileData.last_name);
@@ -587,6 +593,7 @@ const AuthProvider = ({ children }) => {
     // State
     user,
     tokens,
+    isInitializing,
     loading,
     error,
     isAuthenticated,

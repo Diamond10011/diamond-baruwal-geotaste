@@ -5,7 +5,7 @@ const API_URL = 'http://127.0.0.1:8000/api/'
 export const register = async (data) => axios.post(`${API_URL}register/`, data);
 export const login = async (data) => axios.post(`${API_URL}login/`, data);
 export const forgotPassword = async (data) => axios.post(`${API_URL}forgot-password/`, data);
-export const verifyOTP = async (data) => axios.post(`${API_URL}verify-otp/`, data);
+export const verifyOTP = async (data) => axios.post(`${API_URL}verify-password-reset-otp/`, data);
 export const resetPassword = async (data) => axios.post(`${API_URL}reset-password/`, data);
 
 // Protected calls with token
