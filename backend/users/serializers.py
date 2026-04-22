@@ -4,7 +4,7 @@ from django.contrib.auth.password_validation import validate_password
 from .models import (
     CustomUser, UserProfile, StoreUserProfile, RestaurantUserProfile, OTP, PasswordResetToken,
     Recipe, RecipeRating, RecipeLike, FavoriteRecipe, RestaurantLocation, RestaurantMenu, RestaurantRating,
-    StoreProduct, Order, OrderItem, Payment
+    StoreProduct, Verification, Notification
 )
 from django.core.mail import send_mail
 from django.conf import settings
@@ -651,42 +651,29 @@ class StoreProductSerializer(serializers.ModelSerializer):
 
 
 
-class OrderItemSerializer(serializers.ModelSerializer):
-    """Serializer for order items"""
-    product_name = serializers.CharField(source='product.name', read_only=True)
-    product_id = serializers.IntegerField(source='product.id', read_only=True)
-    
-    class Meta:
-        model = OrderItem
-        fields = ['id', 'product_id', 'product_name', 'quantity', 'price', 'subtotal']
-        read_only_fields = ['id', 'subtotal']
 
 
-class OrderSerializer(serializers.ModelSerializer):
-    """Serializer for orders"""
-    items = OrderItemSerializer(many=True, read_only=True)
-    customer_email = serializers.CharField(source='customer.email', read_only=True)
-    store_name = serializers.CharField(source='store.store_name', read_only=True)
-    
+# ============================================================================
+# VERIFICATION & NOTIFICATION SERIALIZERS
+# ============================================================================
+
+class VerificationSerializer(serializers.ModelSerializer):
+    """Serializer for user verifications."""
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    reviewed_by_email = serializers.CharField(source='reviewed_by.email', read_only=True)
+
     class Meta:
-        model = Order
+        model = Verification
         fields = [
-            'id', 'order_id', 'customer_email', 'store_name', 'status',
-            'total_amount', 'subtotal', 'tax', 'delivery_address', 'notes',
-            'items', 'created_at', 'updated_at'
+            'id', 'user_email', 'document1', 'document2', 'status',
+            'submitted_at', 'reviewed_at', 'reviewed_by_email', 'rejection_reason'
         ]
-        read_only_fields = ['id', 'order_id', 'total_amount', 'subtotal', 'tax', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'user_email', 'status', 'submitted_at', 'reviewed_at', 'reviewed_by_email']
 
 
-class PaymentSerializer(serializers.ModelSerializer):
-    """Serializer for payments"""
-    order_id = serializers.CharField(source='order.order_id', read_only=True)
-    
+class NotificationSerializer(serializers.ModelSerializer):
+    """Serializer for notifications."""
     class Meta:
-        model = Payment
-        fields = [
-            'id', 'payment_id', 'order_id', 'amount', 'payment_method',
-            'status', 'transaction_id', 'notes', 'created_at', 'updated_at'
-        ]
-        read_only_fields = ['id', 'payment_id', 'created_at', 'updated_at']
-
+        model = Notification
+        fields = ['id', 'message', 'type', 'is_read', 'created_at']
+        read_only_fields = ['id', 'created_at']

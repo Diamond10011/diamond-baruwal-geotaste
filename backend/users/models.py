@@ -30,6 +30,12 @@ class CustomUser(AbstractUser):
     email = models.EmailField(unique=True, validators=[validate_email])
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='normal')
     is_email_verified = models.BooleanField(default=False)
+    verification_status = models.CharField(
+        max_length=20, 
+        choices=[('pending', 'Pending'), ('verified', 'Verified'), ('rejected', 'Rejected')],
+        default='verified',
+        help_text="Authorization status for store/restaurant accounts"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -308,76 +314,48 @@ class StoreProduct(models.Model):
         return f"{self.name} - {self.store.store_name}"
 
 
-# ============================================================================
-# ORDER & PAYMENT MODELS
-# ============================================================================
+class Verification(models.Model):
+    """Model for account/business verification documents"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='verification')
+    document1 = models.FileField(upload_to='verifications/', help_text="Verification document 1")
+    document2 = models.FileField(upload_to='verifications/', help_text="Verification document 2")
+    status = models.CharField(
+        max_length=20, 
+        choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')],
+        default='pending'
+    )
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        CustomUser, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='reviewed_verifications'
+    )
+    rejection_reason = models.TextField(blank=True)
 
-class Order(models.Model):
-    """Customer orders"""
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('payment_pending', 'Payment Pending'),
-        ('paid', 'Paid'),
-        ('processing', 'Processing'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
-    ]
-    
-    order_id = models.CharField(max_length=100, unique=True, default=uuid.uuid4)
-    customer = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='orders')
-    store = models.ForeignKey(StoreUserProfile, on_delete=models.CASCADE, related_name='orders')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    tax = models.DecimalField(max_digits=8, decimal_places=2, default=0)
-    delivery_address = models.TextField(blank=True)
-    notes = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
     def __str__(self):
-        return f"Order {self.order_id} - {self.customer.email}"
+        return f"Verification for {self.user.email} - {self.status}"
 
 
-class OrderItem(models.Model):
-    """Items in an order"""
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey(StoreProduct, on_delete=models.CASCADE)
-    quantity = models.IntegerField(default=1)
-    price = models.DecimalField(max_digits=8, decimal_places=2)
-    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    def __str__(self):
-        return f"{self.product.name} x {self.quantity} in Order {self.order.order_id}"
-
-
-class Payment(models.Model):
-    """Payment transactions"""
-    PAYMENT_METHOD_CHOICES = [
-        ('card', 'Credit/Debit Card'),
-        ('wallet', 'Wallet'),
-        ('demo', 'Demo Payment'),
+class Notification(models.Model):
+    """System notifications for users"""
+    TYPE_CHOICES = [
+        ('verification', 'Verification'),
+        ('system', 'System'),
     ]
-    
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('processing', 'Processing'),
-        ('completed', 'Completed'),
-        ('failed', 'Failed'),
-        ('refunded', 'Refunded'),
-    ]
-    
-    payment_id = models.CharField(max_length=100, unique=True, default=uuid.uuid4)
-    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='payment')
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='demo')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    transaction_id = models.CharField(max_length=255, blank=True, null=True)
-    notes = models.TextField(blank=True)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='notifications')
+    message = models.TextField()
+    type = models.CharField(max_length=30, choices=TYPE_CHOICES, default='system')
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
+
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
-        return f"Payment {self.payment_id} - {self.status}"
+        return f"Notification for {self.user.email}: {self.message[:30]}"
 

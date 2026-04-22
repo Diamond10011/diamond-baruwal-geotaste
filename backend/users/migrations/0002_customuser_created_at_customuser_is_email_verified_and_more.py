@@ -17,6 +17,127 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql="""
+                    CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+                    -- Add a new UUID column for the user primary key and backfill.
+                    ALTER TABLE users_customuser
+                        ADD COLUMN IF NOT EXISTS id_uuid uuid;
+                    UPDATE users_customuser
+                        SET id_uuid = gen_random_uuid()
+                        WHERE id_uuid IS NULL;
+                    ALTER TABLE users_customuser
+                        ALTER COLUMN id_uuid SET DEFAULT gen_random_uuid();
+                    ALTER TABLE users_customuser
+                        ALTER COLUMN id_uuid SET NOT NULL;
+
+                    -- Convert dependent FK columns to UUID.
+                    -- users_customuser_groups.customuser_id
+                    ALTER TABLE users_customuser_groups
+                        ADD COLUMN IF NOT EXISTS customuser_id_uuid uuid;
+                    UPDATE users_customuser_groups ug
+                        SET customuser_id_uuid = u.id_uuid
+                        FROM users_customuser u
+                        WHERE ug.customuser_id = u.id;
+                    ALTER TABLE users_customuser_groups
+                        DROP CONSTRAINT IF EXISTS users_customuser_gro_customuser_id_958147bf_fk_users_cus;
+                    ALTER TABLE users_customuser_groups
+                        DROP COLUMN IF EXISTS customuser_id;
+                    ALTER TABLE users_customuser_groups
+                        RENAME COLUMN customuser_id_uuid TO customuser_id;
+                    ALTER TABLE users_customuser_groups
+                        ALTER COLUMN customuser_id SET NOT NULL;
+
+                    -- users_customuser_user_permissions.customuser_id
+                    ALTER TABLE users_customuser_user_permissions
+                        ADD COLUMN IF NOT EXISTS customuser_id_uuid uuid;
+                    UPDATE users_customuser_user_permissions up
+                        SET customuser_id_uuid = u.id_uuid
+                        FROM users_customuser u
+                        WHERE up.customuser_id = u.id;
+                    ALTER TABLE users_customuser_user_permissions
+                        DROP CONSTRAINT IF EXISTS users_customuser_use_customuser_id_5771478b_fk_users_cus;
+                    ALTER TABLE users_customuser_user_permissions
+                        DROP COLUMN IF EXISTS customuser_id;
+                    ALTER TABLE users_customuser_user_permissions
+                        RENAME COLUMN customuser_id_uuid TO customuser_id;
+                    ALTER TABLE users_customuser_user_permissions
+                        ALTER COLUMN customuser_id SET NOT NULL;
+
+                    -- users_otp.user_id
+                    ALTER TABLE users_otp
+                        ADD COLUMN IF NOT EXISTS user_id_uuid uuid;
+                    UPDATE users_otp o
+                        SET user_id_uuid = u.id_uuid
+                        FROM users_customuser u
+                        WHERE o.user_id = u.id;
+                    ALTER TABLE users_otp
+                        DROP CONSTRAINT IF EXISTS users_otp_user_id_cd09ace3_fk_users_customuser_id;
+                    ALTER TABLE users_otp
+                        DROP COLUMN IF EXISTS user_id;
+                    ALTER TABLE users_otp
+                        RENAME COLUMN user_id_uuid TO user_id;
+                    ALTER TABLE users_otp
+                        ALTER COLUMN user_id SET NOT NULL;
+
+                    -- django_admin_log.user_id (admin LogEntry)
+                    ALTER TABLE django_admin_log
+                        ADD COLUMN IF NOT EXISTS user_id_uuid uuid;
+                    UPDATE django_admin_log l
+                        SET user_id_uuid = u.id_uuid
+                        FROM users_customuser u
+                        WHERE l.user_id = u.id;
+                    ALTER TABLE django_admin_log
+                        DROP CONSTRAINT IF EXISTS django_admin_log_user_id_c564eba6_fk_users_customuser_id;
+                    ALTER TABLE django_admin_log
+                        DROP COLUMN IF EXISTS user_id;
+                    ALTER TABLE django_admin_log
+                        RENAME COLUMN user_id_uuid TO user_id;
+                    ALTER TABLE django_admin_log
+                        ALTER COLUMN user_id SET NOT NULL;
+
+                    -- Swap PK to UUID now that dependent FKs no longer block it.
+                    ALTER TABLE users_customuser
+                        DROP CONSTRAINT IF EXISTS users_customuser_pkey;
+                    ALTER TABLE users_customuser
+                        DROP COLUMN IF EXISTS id;
+                    ALTER TABLE users_customuser
+                        RENAME COLUMN id_uuid TO id;
+                    ALTER TABLE users_customuser
+                        ADD PRIMARY KEY (id);
+
+                    -- Recreate FK constraints pointing at the new UUID PK.
+                    ALTER TABLE users_customuser_groups
+                        ADD CONSTRAINT users_customuser_gro_customuser_id_958147bf_fk_users_customuser_id
+                        FOREIGN KEY (customuser_id) REFERENCES users_customuser(id)
+                        DEFERRABLE INITIALLY DEFERRED;
+                    ALTER TABLE users_customuser_user_permissions
+                        ADD CONSTRAINT users_customuser_use_customuser_id_5771478b_fk_users_customuser_id
+                        FOREIGN KEY (customuser_id) REFERENCES users_customuser(id)
+                        DEFERRABLE INITIALLY DEFERRED;
+                    ALTER TABLE users_otp
+                        ADD CONSTRAINT users_otp_user_id_cd09ace3_fk_users_customuser_id
+                        FOREIGN KEY (user_id) REFERENCES users_customuser(id)
+                        DEFERRABLE INITIALLY DEFERRED;
+                    ALTER TABLE django_admin_log
+                        ADD CONSTRAINT django_admin_log_user_id_c564eba6_fk_users_customuser_id
+                        FOREIGN KEY (user_id) REFERENCES users_customuser(id)
+                        DEFERRABLE INITIALLY DEFERRED;
+                    """,
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+            ],
+            state_operations=[
+                migrations.AlterField(
+                    model_name='customuser',
+                    name='id',
+                    field=models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False),
+                ),
+            ],
+        ),
         migrations.AddField(
             model_name='customuser',
             name='created_at',
@@ -57,11 +178,6 @@ class Migration(migrations.Migration):
             model_name='customuser',
             name='groups',
             field=models.ManyToManyField(blank=True, help_text='The groups this user belongs to.', related_name='custom_user_groups', related_query_name='user', to='auth.group', verbose_name='groups'),
-        ),
-        migrations.AlterField(
-            model_name='customuser',
-            name='id',
-            field=models.UUIDField(default=uuid.uuid4, editable=False, primary_key=True, serialize=False),
         ),
         migrations.AlterField(
             model_name='otp',

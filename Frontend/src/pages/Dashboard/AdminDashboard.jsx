@@ -19,8 +19,6 @@ export default function AdminDashboard() {
       { id: "recipes", label: "Recipes" },
       { id: "restaurants", label: "Restaurants" },
       { id: "stores", label: "Stores" },
-      { id: "orders", label: "Orders" },
-      { id: "payments", label: "Payments" },
     ],
     [],
   );
@@ -55,15 +53,6 @@ export default function AdminDashboard() {
   const [storesQ, setStoresQ] = useState("");
   const [storesVerified, setStoresVerified] = useState("");
 
-  const [orders, setOrders] = useState([]);
-  const [ordersCount, setOrdersCount] = useState(0);
-  const [ordersQ, setOrdersQ] = useState("");
-  const [ordersStatus, setOrdersStatus] = useState("");
-
-  const [payments, setPayments] = useState([]);
-  const [paymentsCount, setPaymentsCount] = useState(0);
-  const [paymentsQ, setPaymentsQ] = useState("");
-  const [paymentsStatus, setPaymentsStatus] = useState("");
 
   const clearMessages = () => {
     setError("");
@@ -133,32 +122,7 @@ export default function AdminDashboard() {
     setStoresCount(res.data.count || 0);
   };
 
-  const fetchOrders = async () => {
-    const params = new URLSearchParams();
-    if (ordersQ.trim()) params.set("q", ordersQ.trim());
-    if (ordersStatus) params.set("status", ordersStatus);
-    params.set("limit", "100");
-    params.set("offset", "0");
-    const res = await axios.get(`${API_BASE_URL}/admin/orders/?${params.toString()}`, {
-      headers: authHeaders,
-    });
-    setOrders(res.data.results || []);
-    setOrdersCount(res.data.count || 0);
-  };
-
-  const fetchPayments = async () => {
-    const params = new URLSearchParams();
-    if (paymentsQ.trim()) params.set("q", paymentsQ.trim());
-    if (paymentsStatus) params.set("status", paymentsStatus);
-    params.set("limit", "100");
-    params.set("offset", "0");
-    const res = await axios.get(`${API_BASE_URL}/admin/payments/?${params.toString()}`, {
-      headers: authHeaders,
-    });
-    setPayments(res.data.results || []);
-    setPaymentsCount(res.data.count || 0);
-  };
-
+  
   useEffect(() => {
     const init = async () => {
       if (!isAuthenticated || user?.role !== "admin") {
@@ -190,8 +154,6 @@ export default function AdminDashboard() {
         if (activeTab === "recipes") await fetchRecipes();
         if (activeTab === "restaurants") await fetchRestaurants();
         if (activeTab === "stores") await fetchStores();
-        if (activeTab === "orders") await fetchOrders();
-        if (activeTab === "payments") await fetchPayments();
       } catch (e) {
         setError(e.response?.data?.error || "Failed to load admin data");
       } finally {
@@ -231,7 +193,7 @@ export default function AdminDashboard() {
           <div>
             <h1 className="text-4xl font-extrabold text-gray-900">Admin</h1>
             <p className="text-gray-600 mt-1">
-              Manage users, content, verifications, and commerce
+              Manage users, content, and verifications
             </p>
           </div>
           <button
@@ -259,7 +221,7 @@ export default function AdminDashboard() {
           <Alert message={success} type="success" onClose={() => setSuccess("")} />
         ) : null}
 
-        <div className="flex gap-2 mb-8 border-b border-gray-200 overflow-x-auto">
+        <div className="flex gap-2 mb-8 border-b border-gray-200 ">
           {TABS.map((t) => (
             <button
               key={t.id}
@@ -298,17 +260,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </Card>
-              <Card className="lg:col-span-2">
-                <h2 className="text-lg font-extrabold text-gray-900 mb-4">Orders</h2>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  {Object.entries(summary?.commerce?.orders_by_status || {}).map(([k, v]) => (
-                    <div key={k} className="rounded-xl border border-gray-200 p-4">
-                      <p className="text-gray-500">{k}</p>
-                      <p className="text-2xl font-extrabold text-gray-900 mt-1">{v}</p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
+              
             </div>
           </div>
         )}
@@ -985,259 +937,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === "orders" && (
-          <div className="space-y-6">
-            <Card>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Search
-                  </label>
-                  <input
-                    value={ordersQ}
-                    onChange={(e) => setOrdersQ(e.target.value)}
-                    placeholder="Order id, customer email, store name"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Status
-                  </label>
-                  <select
-                    value={ordersStatus}
-                    onChange={(e) => setOrdersStatus(e.target.value)}
-                    className="w-full px-3 py-3 border-2 border-gray-200 rounded-xl bg-white"
-                  >
-                    <option value="">All</option>
-                    <option value="pending">pending</option>
-                    <option value="payment_pending">payment_pending</option>
-                    <option value="paid">paid</option>
-                    <option value="processing">processing</option>
-                    <option value="completed">completed</option>
-                    <option value="cancelled">cancelled</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={async () => {
-                    try {
-                      setLoading(true);
-                      clearMessages();
-                      await fetchOrders();
-                    } catch (e) {
-                      setError(e.response?.data?.error || "Failed to load orders");
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  className="px-6 py-3 rounded-xl bg-orange-600 text-white font-extrabold hover:bg-orange-700 transition"
-                >
-                  Apply
-                </button>
-              </div>
-            </Card>
-
-            <Card>
-              <h2 className="text-xl font-extrabold text-gray-900 mb-4">
-                Orders ({ordersCount})
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-gray-600">
-                      <th className="py-2 pr-4">Order</th>
-                      <th className="py-2 pr-4">Customer</th>
-                      <th className="py-2 pr-4">Store</th>
-                      <th className="py-2 pr-4">Total</th>
-                      <th className="py-2 pr-4">Status</th>
-                      <th className="py-2 pr-4">Items</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {orders.map((o) => (
-                      <tr key={o.order_id} className="border-t">
-                        <td className="py-3 pr-4 font-semibold text-gray-900">
-                          {o.order_id}
-                        </td>
-                        <td className="py-3 pr-4 text-gray-700">{o.customer_email}</td>
-                        <td className="py-3 pr-4 text-gray-700">{o.store_name}</td>
-                        <td className="py-3 pr-4 text-gray-700">
-                          Rs. {o.total_amount}
-                        </td>
-                        <td className="py-3 pr-4">
-                          <select
-                            value={o.status}
-                            onChange={async (e) => {
-                              try {
-                                setLoading(true);
-                                clearMessages();
-                                await axios.put(
-                                  `${API_BASE_URL}/admin/orders/${o.order_id}/`,
-                                  { status: e.target.value },
-                                  { headers: authHeaders },
-                                );
-                                await fetchOrders();
-                              } catch (err) {
-                                setError(err.response?.data?.error || "Failed to update order");
-                              } finally {
-                                setLoading(false);
-                              }
-                            }}
-                            className="px-2 py-2 border border-gray-200 rounded-lg bg-white"
-                          >
-                            <option value="pending">pending</option>
-                            <option value="payment_pending">payment_pending</option>
-                            <option value="paid">paid</option>
-                            <option value="processing">processing</option>
-                            <option value="completed">completed</option>
-                            <option value="cancelled">cancelled</option>
-                          </select>
-                        </td>
-                        <td className="py-3 pr-4 text-gray-700">{o.items_count}</td>
-                      </tr>
-                    ))}
-                    {orders.length === 0 && (
-                      <tr>
-                        <td className="py-8 text-center text-gray-600" colSpan={6}>
-                          No orders found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === "payments" && (
-          <div className="space-y-6">
-            <Card>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Search
-                  </label>
-                  <input
-                    value={paymentsQ}
-                    onChange={(e) => setPaymentsQ(e.target.value)}
-                    placeholder="Payment id, transaction id, order id, customer, store"
-                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">
-                    Status
-                  </label>
-                  <select
-                    value={paymentsStatus}
-                    onChange={(e) => setPaymentsStatus(e.target.value)}
-                    className="w-full px-3 py-3 border-2 border-gray-200 rounded-xl bg-white"
-                  >
-                    <option value="">All</option>
-                    <option value="pending">pending</option>
-                    <option value="processing">processing</option>
-                    <option value="completed">completed</option>
-                    <option value="failed">failed</option>
-                    <option value="refunded">refunded</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-4 flex justify-end">
-                <button
-                  onClick={async () => {
-                    try {
-                      setLoading(true);
-                      clearMessages();
-                      await fetchPayments();
-                    } catch (e) {
-                      setError(e.response?.data?.error || "Failed to load payments");
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  className="px-6 py-3 rounded-xl bg-orange-600 text-white font-extrabold hover:bg-orange-700 transition"
-                >
-                  Apply
-                </button>
-              </div>
-            </Card>
-
-            <Card>
-              <h2 className="text-xl font-extrabold text-gray-900 mb-4">
-                Payments ({paymentsCount})
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-gray-600">
-                      <th className="py-2 pr-4">Payment</th>
-                      <th className="py-2 pr-4">Order</th>
-                      <th className="py-2 pr-4">Customer</th>
-                      <th className="py-2 pr-4">Store</th>
-                      <th className="py-2 pr-4">Amount</th>
-                      <th className="py-2 pr-4">Method</th>
-                      <th className="py-2 pr-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payments.map((p) => (
-                      <tr key={p.payment_id} className="border-t">
-                        <td className="py-3 pr-4 font-semibold text-gray-900">
-                          {p.payment_id}
-                        </td>
-                        <td className="py-3 pr-4 text-gray-700">{p.order_id}</td>
-                        <td className="py-3 pr-4 text-gray-700">{p.customer_email}</td>
-                        <td className="py-3 pr-4 text-gray-700">{p.store_name}</td>
-                        <td className="py-3 pr-4 text-gray-700">Rs. {p.amount}</td>
-                        <td className="py-3 pr-4 text-gray-700">{p.payment_method}</td>
-                        <td className="py-3 pr-4">
-                          <select
-                            value={p.status}
-                            onChange={async (e) => {
-                              try {
-                                setLoading(true);
-                                clearMessages();
-                                await axios.put(
-                                  `${API_BASE_URL}/admin/payments/${p.payment_id}/`,
-                                  { status: e.target.value },
-                                  { headers: authHeaders },
-                                );
-                                await fetchPayments();
-                              } catch (err) {
-                                setError(err.response?.data?.error || "Failed to update payment");
-                              } finally {
-                                setLoading(false);
-                              }
-                            }}
-                            className="px-2 py-2 border border-gray-200 rounded-lg bg-white"
-                          >
-                            <option value="pending">pending</option>
-                            <option value="processing">processing</option>
-                            <option value="completed">completed</option>
-                            <option value="failed">failed</option>
-                            <option value="refunded">refunded</option>
-                          </select>
-                        </td>
-                      </tr>
-                    ))}
-                    {payments.length === 0 && (
-                      <tr>
-                        <td className="py-8 text-center text-gray-600" colSpan={7}>
-                          No payments found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-          </div>
-        )}
       </div>
     </Container>
   );

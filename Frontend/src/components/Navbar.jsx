@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import axios from "axios";
 import logo from "../assets/Image/GeoTasteLogo.png";
 import {
   UtensilsCrossed,
@@ -14,13 +15,26 @@ import {
   X,
   ChevronDown,
   Search,
+  Bell,
+  Shield,
 } from "lucide-react";
+
+const API_BASE_URL = "http://localhost:8000/api";
 
 const Navbar = () => {
   const { user, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetchNotifications(true).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   const handleLogout = async () => {
     await logout();
@@ -35,14 +49,65 @@ const Navbar = () => {
     { to: "/recommendations", label: "Recommendations", icon: <Bot className="w-4 h-4" />, roles: ["admin", "normal", "customer"] },
     { to: "/restaurants", label: "Restaurants", icon: <Search className="w-4 h-4" />, roles: ["admin", "restaurant", "chef", "normal", "customer"] },
     { to: "/admin-dashboard", label: "Admin", icon: <LayoutDashboard className="w-4 h-4" />, roles: ["admin"] },
-    { to: "/restaurant-profile", label: "Manage Restaurant", icon: <UtensilsCrossed className="w-4 h-4" />, roles: ["restaurant"] },
-    { to: "/store-profile", label: "Manage Store", icon: <Store className="w-4 h-4" />, roles: ["store"] },
+    { to: "/admin-verifications", label: "Verifications", icon: <Shield className="w-4 h-4" />, roles: ["admin"] },
+    { to: "/verification", label: "Verification", icon: <Shield className="w-4 h-4" />, roles: ["store", "restaurant"] },
+    { to: "/restaurant-profile", label: "Manage Restaurant", icon: <UtensilsCrossed className="w-4 h-4" />, roles: ["restaurant"], requiresVerified: true },
+    { to: "/store-profile", label: "Manage Store", icon: <Store className="w-4 h-4" />, roles: ["store"], requiresVerified: true },
     { to: "/stores", label: "Stores", icon: <Store className="w-4 h-4" />, roles: ["store", "customer", "normal"] },
   ];
 
-  const visibleLinks = allLinks.filter((link) =>
-    link.roles.includes(user?.role),
+  const isFeatureVerified =
+    user?.role === "admin" ||
+    !["store", "restaurant"].includes(user?.role) ||
+    user?.verification_status === "verified";
+
+  const visibleLinks = allLinks.filter(
+    (link) =>
+      link.roles.includes(user?.role) &&
+      (!link.requiresVerified || isFeatureVerified),
   );
+
+  const fetchNotifications = async (unreadOnly = false) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+    const res = await axios.get(
+      `${API_BASE_URL}/notifications/?unread_only=${unreadOnly ? "true" : "false"}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    if (unreadOnly) {
+      setUnreadCount(res.data.count || 0);
+    } else {
+      const list = res.data.notifications || [];
+      setNotifications(list);
+      setUnreadCount(list.filter((n) => !n.is_read).length);
+    }
+  };
+
+  const markAllRead = async () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+    await axios.put(
+      `${API_BASE_URL}/notifications/read-all/`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    setUnreadCount(0);
+  };
+
+  const markOneRead = async (id) => {
+    const token = localStorage.getItem("access_token");
+    if (!token) return;
+    await axios.put(
+      `${API_BASE_URL}/notifications/${id}/read/`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } },
+    );
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
+    );
+    setUnreadCount((c) => Math.max(0, c - 1));
+  };
 
   const getRoleBadgeColor = (role) => {
     switch (role) {
@@ -111,6 +176,69 @@ const Navbar = () => {
                       {link.label}
                     </NavLink>
                   ))}
+                </div>
+
+                {/* Notifications */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const next = !isNotifOpen;
+                      setIsNotifOpen(next);
+                      if (next) {
+                        await fetchNotifications(false);
+                      }
+                    }}
+                    className="relative inline-flex items-center justify-center rounded-2xl bg-white/60 p-3 shadow-sm ring-1 ring-orange-100 hover:bg-white transition-all duration-200"
+                    aria-label="Notifications"
+                  >
+                    <Bell className="w-5 h-5 text-gray-700" />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold flex items-center justify-center">
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </button>
+
+                  {isNotifOpen && (
+                    <div className="absolute right-0 mt-3 w-96 max-w-[90vw] rounded-2xl bg-white shadow-xl ring-1 ring-black/5 border border-orange-100 overflow-hidden">
+                      <div className="px-4 py-3 flex items-center justify-between border-b border-gray-100">
+                        <p className="text-sm font-extrabold text-gray-900">
+                          Notifications
+                        </p>
+                        <button
+                          onClick={markAllRead}
+                          className="text-xs font-bold text-orange-600 hover:text-orange-700"
+                        >
+                          Mark all read
+                        </button>
+                      </div>
+                      <div className="max-h-80 overflow-auto">
+                        {notifications.length === 0 ? (
+                          <div className="px-4 py-6 text-sm text-gray-600 font-semibold">
+                            No notifications.
+                          </div>
+                        ) : (
+                          notifications.map((n) => (
+                            <button
+                              key={n.id}
+                              onClick={() => markOneRead(n.id)}
+                              className={`w-full text-left px-4 py-3 border-b border-gray-50 hover:bg-orange-50 transition ${
+                                n.is_read ? "bg-white" : "bg-orange-50/40"
+                              }`}
+                            >
+                              <p className="text-sm font-semibold text-gray-900">
+                                {n.message}
+                              </p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {new Date(n.created_at).toLocaleString()}
+                              </p>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* User Menu */}

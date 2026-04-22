@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import CustomUser, UserProfile, StoreUserProfile, RestaurantUserProfile, OTP, PasswordResetToken
+from .models import CustomUser, UserProfile, StoreUserProfile, RestaurantUserProfile, OTP, PasswordResetToken, Verification, Notification
 
 @admin.register(CustomUser)
 class CustomUserAdmin(BaseUserAdmin):
@@ -8,7 +8,7 @@ class CustomUserAdmin(BaseUserAdmin):
     list_filter = ['role', 'is_email_verified', 'created_at']
     search_fields = ['email']
     fieldsets = BaseUserAdmin.fieldsets + (
-        ('Custom Fields', {'fields': ('role', 'is_email_verified')}),
+        ('Custom Fields', {'fields': ('role', 'is_email_verified', 'verification_status')}),
     )
 
 @admin.register(UserProfile)
@@ -39,3 +39,14 @@ class PasswordResetTokenAdmin(admin.ModelAdmin):
     list_display = ['user', 'is_used', 'created_at', 'expires_at']
     list_filter = ['is_used', 'created_at']
     search_fields = ['user__email']
+
+@admin.register(Verification)
+class VerificationAdmin(admin.ModelAdmin):
+    list_display = ['user', 'status', 'submitted_at', 'reviewed_at']
+    list_filter = ['status', 'submitted_at']
+    search_fields = ['user__email']
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ['user', 'type', 'message', 'is_read', 'created_at']
+    list_filter = ['type', 'is_read', 'created_at']

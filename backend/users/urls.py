@@ -12,10 +12,7 @@ from .views import (
     restaurant_list, restaurant_detail, restaurant_nearby, restaurant_menu, restaurant_rating, restaurant_location,
     # Store product endpoints
     store_list, store_products, store_product_detail,
-    # Order endpoints
-    orders, order_detail,
-    # Payment endpoints
-    process_payment, payment_detail,
+
     # Recommendation endpoints
     recommend_recipes, popular_recipes, recommend_restaurants, popular_restaurants,
     trending_recipes, user_recommendations_summary,
@@ -25,8 +22,7 @@ from .views import (
     admin_recipes, admin_recipe_delete,
     admin_restaurants, admin_restaurant_detail,
     admin_stores, admin_store_detail,
-    admin_orders, admin_order_update,
-    admin_payments, admin_payment_update,
+
 )
 
 urlpatterns = [
@@ -70,10 +66,7 @@ urlpatterns = [
     path('admin/restaurants/<int:restaurant_id>/', admin_restaurant_detail, name='admin_restaurant_detail'),
     path('admin/stores/', admin_stores, name='admin_stores'),
     path('admin/stores/<int:store_id>/', admin_store_detail, name='admin_store_detail'),
-    path('admin/orders/', admin_orders, name='admin_orders'),
-    path('admin/orders/<str:order_id>/', admin_order_update, name='admin_order_update'),
-    path('admin/payments/', admin_payments, name='admin_payments'),
-    path('admin/payments/<str:payment_id>/', admin_payment_update, name='admin_payment_update'),
+
     
     # ==================== RECIPES ====================
     path('recipes/', recipe_list, name='recipe_list'),
@@ -97,13 +90,7 @@ urlpatterns = [
     path('store-products/', store_products, name='store_products'),
     path('store-products/<int:product_id>/', store_product_detail, name='store_product_detail'),
     
-    # ==================== ORDERS ====================
-    path('orders/', orders, name='orders'),
-    path('orders/<str:order_id>/', order_detail, name='order_detail'),
-    
-    # ==================== PAYMENTS ====================
-    path('payments/process/', process_payment, name='process_payment'),
-    path('payments/<str:payment_id>/', payment_detail, name='payment_detail'),
+
     
     # ==================== RECOMMENDATIONS ====================
     path('recommendations/recipes/', recommend_recipes, name='recommend_recipes'),

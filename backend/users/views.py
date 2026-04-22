@@ -7,7 +7,7 @@ from django.contrib.auth import authenticate
 from .models import (
     CustomUser, UserProfile, StoreUserProfile, RestaurantUserProfile, OTP,
     Recipe, RecipeRating, RecipeLike, FavoriteRecipe, RestaurantLocation, RestaurantMenu, RestaurantRating,
-    StoreProduct, Order, OrderItem, Payment
+    StoreProduct, Verification, Notification
 )
 from .serializers import (
     RegisterSerializer, LoginSerializer, UserSerializer, UserProfileSerializer,
@@ -18,7 +18,7 @@ from .serializers import (
     RecipeRatingSerializer, RecipeLikeSerializer, FavoriteRecipeSerializer,
     RestaurantListSerializer, RestaurantDetailSerializer, RestaurantMenuSerializer,
     RestaurantLocationSerializer, RestaurantRatingSerializer, NearbyRestaurantSerializer,
-    StoreProductSerializer, OrderSerializer, OrderItemSerializer, PaymentSerializer
+    VerificationSerializer, NotificationSerializer
 )
 from django.utils import timezone
 import uuid
@@ -476,7 +476,6 @@ def _repair_bad_customuser_ids():
         ("users_recipelike", "user_id"),
         ("users_favoriterecipe", "user_id"),
         ("users_restaurantrating", "user_id"),
-        ("users_order", "customer_id"),
         ("django_admin_log", "user_id"),
     ]
 
@@ -534,12 +533,6 @@ def admin_summary(request):
     pending_restaurant_verifications = RestaurantUserProfile.objects.filter(is_verified=False).count()
     pending_store_verifications = StoreUserProfile.objects.filter(is_verified=False).count()
 
-    orders_by_status = {
-        row["status"]: row["c"]
-        for row in Order.objects.values("status").annotate(c=Count("id"))
-    }
-    total_orders = Order.objects.count()
-    total_payments = Payment.objects.count()
 
     return Response(
         {
@@ -558,11 +551,6 @@ def admin_summary(request):
             "verifications": {
                 "restaurants_pending": pending_restaurant_verifications,
                 "stores_pending": pending_store_verifications,
-            },
-            "commerce": {
-                "orders_total": total_orders,
-                "orders_by_status": orders_by_status,
-                "payments_total": total_payments,
             },
         },
         status=status.HTTP_200_OK,
@@ -938,162 +926,6 @@ def admin_store_detail(request, store_id):
         return Response({"message": "Store updated", "store": serializer.data}, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def admin_orders(request):
-    """
-    Admin: list orders.
-    Query params: status, q(order_id/customer/store), limit, offset
-    """
-    from django.db.models import Q
-
-    denied = _require_admin(request)
-    if denied:
-        return denied
-
-    status_filter = (request.query_params.get("status") or "").strip()
-    q = (request.query_params.get("q") or "").strip()
-    limit = int(request.query_params.get("limit", 50))
-    offset = int(request.query_params.get("offset", 0))
-
-    qs = Order.objects.all().select_related("customer", "store").order_by("-created_at")
-    if status_filter:
-        qs = qs.filter(status=status_filter)
-    if q:
-        qs = qs.filter(
-            Q(order_id__icontains=q)
-            | Q(customer__email__icontains=q)
-            | Q(store__store_name__icontains=q)
-        )
-    total = qs.count()
-    results = []
-    for o in qs[offset:offset + limit]:
-        results.append(
-            {
-                "order_id": o.order_id,
-                "status": o.status,
-                "customer_email": o.customer.email,
-                "store_id": o.store_id,
-                "store_name": o.store.store_name,
-                "subtotal": o.subtotal,
-                "tax": o.tax,
-                "total_amount": o.total_amount,
-                "delivery_address": o.delivery_address,
-                "created_at": o.created_at,
-                "items_count": o.items.count(),
-                "has_payment": hasattr(o, "payment"),
-            }
-        )
-    return Response({"count": total, "results": results, "limit": limit, "offset": offset}, status=status.HTTP_200_OK)
-
-
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-def admin_order_update(request, order_id):
-    """
-    Admin: update order status/notes.
-    Body: {status, notes, delivery_address}
-    """
-    denied = _require_admin(request)
-    if denied:
-        return denied
-
-    try:
-        o = Order.objects.get(order_id=order_id)
-    except Order.DoesNotExist:
-        return Response({"error": "Order not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    data = request.data or {}
-    if "status" in data:
-        new_status = data.get("status")
-        valid = {s for (s, _label) in Order.STATUS_CHOICES}
-        if new_status not in valid:
-            return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
-        o.status = new_status
-    if "notes" in data:
-        o.notes = data.get("notes") or ""
-    if "delivery_address" in data:
-        o.delivery_address = data.get("delivery_address") or ""
-    o.save()
-    return Response({"message": "Order updated", "order": OrderSerializer(o).data}, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def admin_payments(request):
-    """
-    Admin: list payments.
-    Query params: status, q(payment_id/order_id/customer/store), limit, offset
-    """
-    from django.db.models import Q
-
-    denied = _require_admin(request)
-    if denied:
-        return denied
-
-    status_filter = (request.query_params.get("status") or "").strip()
-    q = (request.query_params.get("q") or "").strip()
-    limit = int(request.query_params.get("limit", 50))
-    offset = int(request.query_params.get("offset", 0))
-
-    qs = Payment.objects.all().select_related("order", "order__customer", "order__store").order_by("-created_at")
-    if status_filter:
-        qs = qs.filter(status=status_filter)
-    if q:
-        qs = qs.filter(
-            Q(payment_id__icontains=q)
-            | Q(transaction_id__icontains=q)
-            | Q(order__order_id__icontains=q)
-            | Q(order__customer__email__icontains=q)
-            | Q(order__store__store_name__icontains=q)
-        )
-    total = qs.count()
-    results = []
-    for p in qs[offset:offset + limit]:
-        results.append(
-            {
-                "payment_id": p.payment_id,
-                "status": p.status,
-                "payment_method": p.payment_method,
-                "amount": p.amount,
-                "transaction_id": p.transaction_id,
-                "order_id": p.order.order_id,
-                "customer_email": p.order.customer.email,
-                "store_name": p.order.store.store_name,
-                "created_at": p.created_at,
-            }
-        )
-    return Response({"count": total, "results": results, "limit": limit, "offset": offset}, status=status.HTTP_200_OK)
-
-
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated])
-def admin_payment_update(request, payment_id):
-    """
-    Admin: update payment status/notes.
-    Body: {status, notes}
-    """
-    denied = _require_admin(request)
-    if denied:
-        return denied
-
-    try:
-        p = Payment.objects.get(payment_id=payment_id)
-    except Payment.DoesNotExist:
-        return Response({"error": "Payment not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    data = request.data or {}
-    if "status" in data:
-        new_status = data.get("status")
-        valid = {s for (s, _label) in Payment.STATUS_CHOICES}
-        if new_status not in valid:
-            return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
-        p.status = new_status
-    if "notes" in data:
-        p.notes = data.get("notes") or ""
-    p.save()
-    return Response({"message": "Payment updated", "payment": PaymentSerializer(p).data}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -1668,207 +1500,7 @@ def store_product_detail(request, product_id):
 # ORDER ENDPOINTS
 # ============================================================================
 
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def orders(request):
-    """
-    GET: Get user's orders
-    POST: Create a new order
-    """
-    if request.method == 'GET':
-        if request.user.role == 'store':
-            user_orders = Order.objects.filter(store__user=request.user).order_by('-created_at')
-        else:
-            user_orders = Order.objects.filter(customer=request.user).order_by('-created_at')
-        serializer = OrderSerializer(user_orders, many=True)
-        return Response({
-            'count': user_orders.count(),
-            'orders': serializer.data
-        }, status=status.HTTP_200_OK)
-    
-    # POST - Create order
-    data = request.data
-    
-    # Get or create store
-    store_id = data.get('store_id')
-    if not store_id:
-        return Response({'error': 'store_id is required'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    try:
-        store = StoreUserProfile.objects.get(id=store_id)
-    except StoreUserProfile.DoesNotExist:
-        return Response({'error': 'Store not found'}, status=status.HTTP_404_NOT_FOUND)
-    
-    # Create order
-    import uuid
-    order = Order.objects.create(
-        order_id=str(uuid.uuid4()),
-        customer=request.user,
-        store=store,
-        delivery_address=data.get('delivery_address', ''),
-        notes=data.get('notes', '')
-    )
-    
-    # Add order items
-    items_data = data.get('items', [])
-    subtotal = 0
-    
-    for item in items_data:
-        product_id = item.get('product_id')
-        quantity = item.get('quantity', 1)
-        
-        try:
-            # Ensure items belong to the selected store.
-            product = StoreProduct.objects.get(id=product_id, store=store)
-        except StoreProduct.DoesNotExist:
-            order.delete()
-            return Response({'error': f'Product {product_id} not found'}, status=status.HTTP_404_NOT_FOUND)
-        
-        if not product.is_available:
-            order.delete()
-            return Response({'error': f'{product.name} is not available'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if product.stock < quantity:
-            order.delete()
-            return Response({'error': f'{product.name} has insufficient stock'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        item_subtotal = float(product.price) * quantity
-        OrderItem.objects.create(
-            order=order,
-            product=product,
-            quantity=quantity,
-            price=product.price,
-            subtotal=item_subtotal
-        )
-        # Reduce stock so future buyers see accurate availability.
-        product.stock = product.stock - int(quantity)
-        product.save(update_fields=['stock'])
-        subtotal += item_subtotal
-    
-    # Calculate tax and total
-    tax = round(subtotal * 0.1, 2)  # 10% tax
-    total = subtotal + tax
-    
-    # Update order totals
-    order.subtotal = subtotal
-    order.tax = tax
-    order.total_amount = total
-    order.status = 'payment_pending'
-    order.save()
-    
-    return Response({
-        'message': 'Order created successfully',
-        'order': OrderSerializer(order).data
-    }, status=status.HTTP_201_CREATED)
-
-
-@api_view(['GET', 'PUT'])
-@permission_classes([IsAuthenticated])
-def order_detail(request, order_id):
-    """
-    Get or update an order
-    """
-    try:
-        order = Order.objects.get(order_id=order_id)
-    except Order.DoesNotExist:
-        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
-    
-    # Check if user owns this order
-    if order.customer != request.user and order.store.user != request.user:
-        return Response({'error': 'You cannot access this order'}, status=status.HTTP_403_FORBIDDEN)
-    
-    if request.method == 'GET':
-        serializer = OrderSerializer(order)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    elif request.method == 'PUT':
-        # Only allow updating delivery address and notes
-        order.delivery_address = request.data.get('delivery_address', order.delivery_address)
-        order.notes = request.data.get('notes', order.notes)
-        order.save()
-        
-        return Response({
-            'message': 'Order updated successfully',
-            'order': OrderSerializer(order).data
-        }, status=status.HTTP_200_OK)
-
-
-# ============================================================================
-# PAYMENT ENDPOINTS
-# ============================================================================
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def process_payment(request):
-    """
-    Process payment for an order (demo payment)
-    """
-    data = request.data
-    order_id = data.get('order_id')
-    payment_method = data.get('payment_method', 'demo')
-    
-    if not order_id:
-        return Response({'error': 'order_id is required'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    try:
-        order = Order.objects.get(order_id=order_id)
-    except Order.DoesNotExist:
-        return Response({'error': 'Order not found'}, status=status.HTTP_404_NOT_FOUND)
-    
-    # Check if user owns this order
-    if order.customer != request.user:
-        return Response({'error': 'You can only pay for your own orders'}, status=status.HTTP_403_FORBIDDEN)
-    
-    # Check if payment already exists
-    if hasattr(order, 'payment'):
-        return Response({
-            'error': 'Payment already processed for this order',
-            'payment': PaymentSerializer(order.payment).data
-        }, status=status.HTTP_400_BAD_REQUEST)
-    
-    import uuid
-    # Create payment record
-    payment = Payment.objects.create(
-        payment_id=str(uuid.uuid4()),
-        order=order,
-        amount=order.total_amount,
-        payment_method=payment_method,
-        status='pending'
-    )
-    
-    # Demo payment - automatically mark as completed
-    payment.status = 'completed'
-    payment.transaction_id = f'DEMO-{str(uuid.uuid4())[:8].upper()}'
-    payment.save()
-    
-    # Update order status
-    order.status = 'paid'
-    order.save()
-    
-    return Response({
-        'message': 'Payment processed successfully (Demo)',
-        'payment': PaymentSerializer(payment).data,
-        'order': OrderSerializer(order).data
-    }, status=status.HTTP_201_CREATED)
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def payment_detail(request, payment_id):
-    """
-    Get payment details
-    """
-    try:
-        payment = Payment.objects.get(payment_id=payment_id)
-    except Payment.DoesNotExist:
-        return Response({'error': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
-    
-    # Check if user owns this payment
-    if payment.order.customer != request.user and payment.order.store.user != request.user:
-        return Response({'error': 'You cannot access this payment'}, status=status.HTTP_403_FORBIDDEN)
-    
-    serializer = PaymentSerializer(payment)
-    return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 # ============================================================================
@@ -2396,3 +2028,189 @@ def user_recommendations_summary(request):
         'popular_restaurants': RestaurantListSerializer(popular_restaurants_list, many=True).data,
         'user_favorite_cuisines': list(favorite_cuisines)
     }, status=status.HTTP_200_OK)
+
+
+# ============================================================================
+# VERIFICATION ENDPOINTS
+# ============================================================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def my_verification(request):
+    """
+    Get the current user's verification status and documents.
+    Matches frontend expectation: { verification_status, verification }
+    """
+    try:
+        verification = Verification.objects.get(user=request.user)
+        serializer = VerificationSerializer(verification)
+        verification_data = serializer.data
+    except Verification.DoesNotExist:
+        verification_data = None
+
+    return Response({
+        'verification_status': request.user.verification_status,
+        'verification': verification_data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_verification(request):
+    """
+    Upload documents for verification.
+    Required fields: document1, document2
+    """
+    user = request.user
+    if user.role not in ['store', 'restaurant']:
+        return Response({'error': 'Only store and restaurant users need verification'}, status=status.HTTP_400_BAD_REQUEST)
+
+    verification, created = Verification.objects.get_or_create(user=user)
+    
+    # If already approved, don't allow re-upload unless admin resets it
+    if verification.status == 'approved':
+        return Response({'error': 'Account already verified'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Update fields
+    if 'document1' in request.FILES:
+        verification.document1 = request.FILES['document1']
+    if 'document2' in request.FILES:
+        verification.document2 = request.FILES['document2']
+    
+    if not verification.document1 or not verification.document2:
+        return Response({'error': 'Both document1 and document2 are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    verification.status = 'pending'
+    verification.submitted_at = timezone.now()
+    verification.save()
+
+    # Update user's verification_status field as well for quick access
+    user.verification_status = 'pending'
+    user.save()
+
+    return Response({
+        'message': 'Verification documents uploaded successfully. Admin will review them.',
+        'status': 'pending'
+    }, status=status.HTTP_200_OK)
+
+
+# ============================================================================
+# NOTIFICATION ENDPOINTS
+# ============================================================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_notifications(request):
+    """
+    List notifications for the current user.
+    """
+    notifications = Notification.objects.filter(user=request.user)
+    serializer = NotificationSerializer(notifications, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_notification_read(request, notification_id):
+    """
+    Mark a specific notification as read.
+    """
+    from .utils import _parse_uuid
+    parsed_id = _parse_uuid(notification_id)
+    if not parsed_id:
+        return Response({'error': 'Invalid notification id'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    try:
+        notification = Notification.objects.get(id=parsed_id, user=request.user)
+        notification.is_read = True
+        notification.save()
+        return Response({'message': 'Notification marked as read'}, status=status.HTTP_200_OK)
+    except Notification.DoesNotExist:
+        return Response({'error': 'Notification not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_all_notifications_read(request):
+    """
+    Mark all user's notifications as read.
+    """
+    Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
+    return Response({'message': 'All notifications marked as read'}, status=status.HTTP_200_OK)
+
+
+# ============================================================================
+# ADMIN VERIFICATION MANAGEMENT
+# ============================================================================
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_verifications(request):
+    """
+    List all verifications for admin review.
+    """
+    if not request.user.is_admin:
+        return Response({'error': 'Only admins can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
+    
+    status_filter = request.query_params.get('status', 'pending')
+    verifications = Verification.objects.filter(status=status_filter).order_by('submitted_at')
+    serializer = VerificationSerializer(verifications, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_review_verification(request, verification_id):
+    """
+    Approve or reject a verification.
+    Expected fields: status ('approved' or 'rejected'), rejection_reason (if rejected)
+    """
+    if not request.user.is_admin:
+        return Response({'error': 'Only admins can access this endpoint'}, status=status.HTTP_403_FORBIDDEN)
+    
+    from .utils import _parse_uuid
+    parsed_id = _parse_uuid(verification_id)
+    if not parsed_id:
+        return Response({'error': 'Invalid verification id'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    try:
+        verification = Verification.objects.get(id=parsed_id)
+    except Verification.DoesNotExist:
+        return Response({'error': 'Verification not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+    new_status = request.data.get('status')
+    reason = request.data.get('rejection_reason', '')
+    
+    if new_status not in ['approved', 'rejected']:
+        return Response({'error': 'Invalid status. Use "approved" or "rejected"'}, status=status.HTTP_400_BAD_REQUEST)
+        
+    verification.status = new_status
+    verification.rejection_reason = reason
+    verification.reviewed_at = timezone.now()
+    verification.reviewed_by = request.user
+    verification.save()
+    
+    # Update the user flag and profiles
+    user = verification.user
+    user.verification_status = 'verified' if new_status == 'approved' else 'rejected'
+    user.save()
+    
+    if user.role == 'store':
+        profile, _ = StoreUserProfile.objects.get_or_create(user=user)
+        profile.is_verified = (new_status == 'approved')
+        profile.save()
+    elif user.role == 'restaurant':
+        profile, _ = RestaurantUserProfile.objects.get_or_create(user=user)
+        profile.is_verified = (new_status == 'approved')
+        profile.save()
+        
+    # Create notification for the user
+    message = "Your account has been verified successfully!" if new_status == 'approved' else f"Your verification was rejected. Reason: {reason}"
+    Notification.objects.create(
+        user=user,
+        message=message,
+        type='verification'
+    )
+    
+    return Response({'message': f'Verification {new_status} successfully'}, status=status.HTTP_200_OK)
+

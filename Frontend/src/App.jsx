@@ -29,10 +29,12 @@ import RestaurantProfile from "./pages/RestaurantProfile";
 import Stores from "./pages/Stores";
 import LandingPage from "./pages/LandingPage";
 import NotFound from "./pages/NotFound";
+import Verification from "./pages/Verification";
 
 // Dashboard Pages
 import UserDashboard from "./pages/Dashboard/UserDashboard";
 import AdminDashboard from "./pages/Dashboard/AdminDashboard";
+import AdminVerifications from "./pages/Dashboard/AdminVerifications";
 
 // Profile Management Pages
 import StoreProfile from "./pages/Profile/StoreProfile";
@@ -113,13 +115,21 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/admin-verifications"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <AdminVerifications />
+                </ProtectedRoute>
+              }
+            />
             {/* Profile Routes */}
             <Route path="/profile" element={<Profile />} />
             {/* Store User Routes */}
             <Route
               path="/store-profile"
               element={
-                <ProtectedRoute requiredRole="store">
+                <ProtectedRoute requiredRole="store" requireVerified>
                   <StoreProfile />
                 </ProtectedRoute>
               }
@@ -128,11 +138,12 @@ export default function App() {
             <Route
               path="/restaurant-profile"
               element={
-                <ProtectedRoute requiredRole="restaurant">
+                <ProtectedRoute requiredRole="restaurant" requireVerified>
                   <RestaurantProfileManagement />
                 </ProtectedRoute>
               }
             />
+            <Route path="/verification" element={<Verification />} />
             {/* Recipe Routes */}{" "}
             <Route path="/recipes" element={<Recipes />} />
             <Route path="/recipes/:id" element={<RecipeDetail />} />

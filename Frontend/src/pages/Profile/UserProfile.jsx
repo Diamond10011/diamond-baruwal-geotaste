@@ -502,11 +502,7 @@ export default function UserProfile() {
                           description: "Get notified about new recipes",
                           enabled: true,
                         },
-                        {
-                          title: "Order Updates",
-                          description: "Notifications about orders",
-                          enabled: false,
-                        },
+
                       ].map((setting, idx) => (
                         <div
                           key={idx}

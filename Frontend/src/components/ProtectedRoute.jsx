@@ -6,6 +6,7 @@ const ProtectedRoute = ({
   children,
   requiredRole = null,
   allowedRoles = null,
+  requireVerified = false,
 }) => {
   const { isAuthenticated, user, isInitializing } = useAuth();
 
@@ -38,6 +39,15 @@ const ProtectedRoute = ({
       return <Navigate to="/admin-dashboard" replace />;
     }
     return <Navigate to="/home" replace />;
+  }
+
+  // Optional verification gate (store/restaurant only)
+  if (
+    requireVerified &&
+    (user?.role === "store" || user?.role === "restaurant") &&
+    user?.verification_status !== "verified"
+  ) {
+    return <Navigate to="/verification" replace />;
   }
 
   return children;
